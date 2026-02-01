@@ -1,0 +1,50 @@
+{
+  "name": "python-ssh-design-review",
+  "description": "Design review agent for Python projects with SSH deployment using Kimi K2.5",
+  "model": {
+    "provider": "kilo_gateway",
+    "model_id": "moonshotai/kimi-k2.5",
+    "temperature": 0.2,
+    "max_tokens": 8192
+  },
+  "agent": {
+    "mode": "review",
+    "max_iterations": 30,
+    "auto_approve_file_ops": false,
+    "auto_approve_shell": [
+      "cat",
+      "ls",
+      "grep",
+      "find"
+    ],
+    "blocked_shell": [
+      "rm",
+      "git",
+      "pip"
+    ]
+  },
+  "context": {
+    "include_files": [
+      "DESIGN_REVIEW_CHECKLIST.md",
+      "DESIGN.md",
+      "IMPLEMENTATION.md"
+    ]
+  },
+  "review": {
+    "checklist_file": "DESIGN_REVIEW_CHECKLIST.md",
+    "require_traceability": true,
+    "max_review_cycles": 1
+  },
+  "rules": [
+    "Read DESIGN.md and IMPLEMENTATION.md completely",
+    "Check DESIGN_REVIEW_CHECKLIST.md systematically - do not skip items",
+    "Verify all dependencies are in requirements.txt or pyproject.toml",
+    "Check SSH deployment commands are documented",
+    "Verify VM test environment is accessible",
+    "Check configuration uses environment variables",
+    "Do NOT modify files - only report findings",
+    "Create DESIGN_REVIEW_RESULTS.md with detailed findings",
+    "If APPROVED: Create DESIGN_APPROVED.md",
+    "If ISSUES: Create DESIGN_ISSUES.md with specific problems and recommendations"
+  ]
+}

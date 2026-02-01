@@ -1,0 +1,62 @@
+{
+  "name": "csharp-ninjatrader-review",
+  "description": "Code review agent for C#/NinjaTrader indicators and strategies using Kimi K2.5",
+  "model": {
+    "provider": "kilo_gateway",
+    "model_id": "moonshotai/kimi-k2.5",
+    "temperature": 0.0,
+    "max_tokens": 4096
+  },
+  "agent": {
+    "mode": "review",
+    "max_iterations": 30,
+    "auto_approve_file_ops": false,
+    "auto_approve_shell": [
+      "git diff",
+      "git log",
+      "git status",
+      "cat",
+      "ls",
+      "grep",
+      "find"
+    ],
+    "blocked_shell": [
+      "rm",
+      "sudo",
+      "git push",
+      "git reset",
+      "dotnet",
+      "msbuild"
+    ]
+  },
+  "context": {
+    "include_files": [
+      "REVIEW_CHECKLIST.md",
+      "IMPLEMENTATION.md",
+      "DESIGN.md",
+      "IMPLEMENTATION_COMPLETE.md"
+    ]
+  },
+  "review": {
+    "checklist_file": "REVIEW_CHECKLIST.md",
+    "max_review_cycles": 2
+  },
+  "rules": [
+    "Validate implementation against IMPLEMENTATION.md specifications",
+    "Desk check code logic - NO compilation on macOS",
+    "Verify proper inheritance from Indicator or Strategy base class",
+    "Check OnBarUpdate() implementation is correct",
+    "Validate input parameter handling with [NinjaScriptProperty]",
+    "Review State management for all state transitions",
+    "Check Dispose() implementation for proper resource cleanup",
+    "Verify event handlers are removed in Dispose() to prevent memory leaks",
+    "Check plot updates are efficient and correct",
+    "Verify all commits match specified messages from IMPLEMENTATION.md",
+    "Check for TODO/FIXME comments that should be resolved",
+    "Create REVIEW_RESULTS.md with detailed pass/fail for each check",
+    "If approved: create REVIEW_APPROVED.md",
+    "If issues found: create REVIEW_ISSUES.md with specific problems",
+    "Do NOT fix issues yourself - report them for implementation agent",
+    "Maximum 2 review cycles before human escalation"
+  ]
+}

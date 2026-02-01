@@ -1,0 +1,33 @@
+{
+  "name": "supabase",
+  "description": "Supabase MCP server for database and auth operations",
+  "command": "npx",
+  "args": ["-y", "@supabase/mcp-server-supabase"],
+  "env": {
+    "SUPABASE_URL": "${SUPABASE_URL}",
+    "SUPABASE_SERVICE_KEY": "${SUPABASE_SERVICE_KEY}"
+  },
+  "platforms": ["react-supabase"],
+  "tools": [
+    {
+      "name": "supabase_query",
+      "description": "Execute SQL query against Supabase database"
+    },
+    {
+      "name": "supabase_insert",
+      "description": "Insert data into a table"
+    },
+    {
+      "name": "supabase_update",
+      "description": "Update data in a table"
+    },
+    {
+      "name": "supabase_delete",
+      "description": "Delete data from a table"
+    },
+    {
+      "name": "supabase_rpc",
+      "description": "Call a database function"
+    }
+  ]
+}

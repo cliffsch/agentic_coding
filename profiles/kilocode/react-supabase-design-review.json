@@ -1,0 +1,60 @@
+{
+  "name": "react-supabase-design-review",
+  "description": "Design review agent for React/Vite/Supabase applications using Kimi K2.5",
+  "model": {
+    "provider": "kilo_gateway",
+    "model_id": "moonshotai/kimi-k2.5",
+    "temperature": 0.2,
+    "max_tokens": 8192
+  },
+  "agent": {
+    "mode": "review",
+    "max_iterations": 30,
+    "auto_approve_file_ops": false,
+    "auto_approve_shell": [
+      "cat",
+      "ls",
+      "grep",
+      "find"
+    ],
+    "blocked_shell": [
+      "rm",
+      "git",
+      "npm",
+      "node"
+    ]
+  },
+  "context": {
+    "include_files": [
+      "DESIGN_REVIEW_CHECKLIST.md",
+      "DESIGN.md",
+      "IMPLEMENTATION.md",
+      "FRONTEND_SPEC.md",
+      "API_SPEC.md",
+      "DATABASE_SCHEMA.md"
+    ]
+  },
+  "review": {
+    "checklist_file": "DESIGN_REVIEW_CHECKLIST.md",
+    "require_traceability": true,
+    "max_review_cycles": 1
+  },
+  "rules": [
+    "Read DESIGN.md, IMPLEMENTATION.md, and all SPEC files completely",
+    "Check DESIGN_REVIEW_CHECKLIST.md systematically - do not skip items",
+    "Verify component structure follows React best practices",
+    "Check Supabase client is properly initialized with environment variables",
+    "Verify TypeScript types are defined for database schema",
+    "Check API routes follow RESTful conventions",
+    "Verify environment variables are documented in .env.example",
+    "Check Vercel deployment configuration is present (vercel.json)",
+    "Verify n8n webhook endpoints are properly secured",
+    "Check database migrations are in supabase/migrations/",
+    "Verify React Query is used for server state management",
+    "Check error boundaries are implemented",
+    "Do NOT modify files - only report findings",
+    "Create DESIGN_REVIEW_RESULTS.md with detailed findings",
+    "If APPROVED: Create DESIGN_APPROVED.md",
+    "If ISSUES: Create DESIGN_ISSUES.md with specific problems and recommendations"
+  ]
+}

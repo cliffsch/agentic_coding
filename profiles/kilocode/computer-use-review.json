@@ -1,0 +1,61 @@
+{
+  "name": "computer-use-review",
+  "description": "Review agent for computer-use-v3 using Kimi K2.5 for analysis and review tasks",
+  "model": {
+    "provider": "kilo_gateway",
+    "model_id": "moonshotai/kimi-k2.5",
+    "temperature": 0.0,
+    "max_tokens": 4096
+  },
+  "agent": {
+    "mode": "review",
+    "max_iterations": 30,
+    "auto_approve_file_ops": false,
+    "auto_approve_shell": [
+      "pytest",
+      "git diff",
+      "git log",
+      "git status",
+      "cat",
+      "ls",
+      "grep",
+      "find",
+      "ssh",
+      "python",
+      "python3"
+    ],
+    "blocked_shell": [
+      "rm",
+      "sudo",
+      "git push",
+      "git reset"
+    ]
+  },
+  "context": {
+    "include_files": [
+      "REVIEW_CHECKLIST.md",
+      "IMPLEMENTATION.md",
+      "DESIGN.md",
+      "IMPLEMENTATION_COMPLETE.md"
+    ],
+    "working_directory": "skills/computer-use-v3"
+  },
+  "review": {
+    "checklist_file": "REVIEW_CHECKLIST.md",
+    "require_all_tests_pass": true,
+    "require_type_hints": true,
+    "max_review_cycles": 2
+  },
+  "rules": [
+    "Validate implementation against IMPLEMENTATION.md specifications",
+    "Run all unit tests: pytest tests/ -v",
+    "Run E2E tests on VM: ssh computer-use-vm 'DISPLAY=:1 python -m computer_use ...'",
+    "Verify all commits match specified messages from IMPLEMENTATION.md",
+    "Check for TODO/FIXME comments that should be resolved",
+    "Create REVIEW_RESULTS.md with detailed pass/fail for each check",
+    "If approved: create REVIEW_APPROVED.md",
+    "If issues found: create REVIEW_ISSUES.md with specific problems",
+    "Do NOT fix issues yourself - report them for implementation agent",
+    "Maximum 2 review cycles before human escalation"
+  ]
+}

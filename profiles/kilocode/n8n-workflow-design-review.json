@@ -1,0 +1,52 @@
+{
+  "name": "n8n-workflow-design-review",
+  "description": "Design review agent for n8n workflow projects using Kimi K2.5",
+  "model": {
+    "provider": "kilo_gateway",
+    "model_id": "moonshotai/kimi-k2.5",
+    "temperature": 0.2,
+    "max_tokens": 8192
+  },
+  "agent": {
+    "mode": "review",
+    "max_iterations": 30,
+    "auto_approve_file_ops": false,
+    "auto_approve_shell": [
+      "cat",
+      "ls",
+      "grep",
+      "find"
+    ],
+    "blocked_shell": [
+      "rm",
+      "git"
+    ]
+  },
+  "context": {
+    "include_files": [
+      "DESIGN_REVIEW_CHECKLIST.md",
+      "DESIGN.md",
+      "IMPLEMENTATION.md",
+      "WORKFLOW_SPEC.md",
+      "WEBHOOK_SPEC.md"
+    ]
+  },
+  "review": {
+    "checklist_file": "DESIGN_REVIEW_CHECKLIST.md",
+    "require_traceability": true,
+    "max_review_cycles": 1
+  },
+  "rules": [
+    "Read DESIGN.md, IMPLEMENTATION.md, and all SPEC files completely",
+    "Check DESIGN_REVIEW_CHECKLIST.md systematically - do not skip items",
+    "Verify workflow JSON structure is valid",
+    "Check credential references use proper naming",
+    "Verify webhook URLs use environment variables",
+    "Check error handling nodes are present",
+    "Verify execution logging is configured",
+    "Do NOT modify files - only report findings",
+    "Create DESIGN_REVIEW_RESULTS.md with detailed findings",
+    "If APPROVED: Create DESIGN_APPROVED.md",
+    "If ISSUES: Create DESIGN_ISSUES.md with specific problems and recommendations"
+  ]
+}

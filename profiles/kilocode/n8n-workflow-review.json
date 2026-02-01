@@ -1,0 +1,58 @@
+{
+  "name": "n8n-workflow-review",
+  "description": "Code review agent for n8n workflow projects using Kimi K2.5",
+  "model": {
+    "provider": "kilo_gateway",
+    "model_id": "moonshotai/kimi-k2.5",
+    "temperature": 0.0,
+    "max_tokens": 4096
+  },
+  "agent": {
+    "mode": "review",
+    "max_iterations": 30,
+    "auto_approve_file_ops": false,
+    "auto_approve_shell": [
+      "git diff",
+      "git log",
+      "git status",
+      "cat",
+      "ls",
+      "grep",
+      "find"
+    ],
+    "blocked_shell": [
+      "rm",
+      "sudo",
+      "git push",
+      "git reset"
+    ]
+  },
+  "context": {
+    "include_files": [
+      "REVIEW_CHECKLIST.md",
+      "IMPLEMENTATION.md",
+      "DESIGN.md",
+      "IMPLEMENTATION_COMPLETE.md"
+    ]
+  },
+  "review": {
+    "checklist_file": "REVIEW_CHECKLIST.md",
+    "max_review_cycles": 2
+  },
+  "rules": [
+    "Validate implementation against IMPLEMENTATION.md specifications",
+    "Validate JSON structure of workflow files",
+    "Check credential references are correct",
+    "Verify error handling paths exist",
+    "Review webhook security configuration",
+    "Check for infinite loops in workflow logic",
+    "Verify all commits match specified messages from IMPLEMENTATION.md",
+    "Check for TODO/FIXME comments that should be resolved",
+    "Create REVIEW_RESULTS.md with detailed pass/fail for each check",
+    "JSON validation must pass for approval",
+    "If approved: create REVIEW_APPROVED.md",
+    "If issues found: create REVIEW_ISSUES.md with specific problems",
+    "Do NOT fix issues yourself - report them for implementation agent",
+    "Maximum 2 review cycles before human escalation"
+  ]
+}

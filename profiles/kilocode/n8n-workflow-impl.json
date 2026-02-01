@@ -1,0 +1,51 @@
+{
+  "name": "n8n-workflow-implementation",
+  "description": "Implementation agent for n8n workflow projects using Minimax M2.1",
+  "model": {
+    "provider": "kilo_gateway",
+    "model_id": "MiniMax/MiniMax-M2-1",
+    "temperature": 0.1,
+    "max_tokens": 8192
+  },
+  "agent": {
+    "mode": "autonomous",
+    "max_iterations": 100,
+    "auto_approve_file_ops": true,
+    "auto_approve_shell": [
+      "git add",
+      "git commit",
+      "git status",
+      "cat",
+      "ls",
+      "mkdir",
+      "touch",
+      "echo"
+    ],
+    "blocked_shell": [
+      "rm -rf /",
+      "sudo",
+      "chmod 777"
+    ]
+  },
+  "context": {
+    "include_files": [
+      "IMPLEMENTATION.md",
+      "DESIGN.md",
+      "WORKFLOW_SPEC.md",
+      "WEBHOOK_SPEC.md"
+    ]
+  },
+  "rules": [
+    "Execute phases in IMPLEMENTATION.md in strict order - do not skip",
+    "Build workflows as JSON files",
+    "Use credential references, not actual values",
+    "Implement error handling nodes",
+    "Document webhook URLs and triggers",
+    "Commit after each phase with exact message from IMPLEMENTATION.md",
+    "Update PROGRESS.md after each phase",
+    "Use explicit file paths - no relative paths",
+    "Do NOT ask clarifying questions - all requirements are documented",
+    "If blocked after 3 attempts, create BLOCKED.md and stop",
+    "Signal completion by creating IMPLEMENTATION_COMPLETE.md"
+  ]
+}

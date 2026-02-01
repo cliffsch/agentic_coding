@@ -1,0 +1,62 @@
+{
+  "name": "computer-use-implementation",
+  "description": "Implementation agent for computer-use-v3 using Minimax M2.1 for coding tasks",
+  "model": {
+    "provider": "kilo_gateway",
+    "model_id": "MiniMax/MiniMax-M2-1",
+    "temperature": 0.1,
+    "max_tokens": 8192
+  },
+  "agent": {
+    "mode": "autonomous",
+    "max_iterations": 100,
+    "auto_approve_file_ops": true,
+    "auto_approve_shell": [
+      "pytest",
+      "pip",
+      "pip install",
+      "git add",
+      "git commit",
+      "git status",
+      "rsync",
+      "ssh",
+      "python",
+      "python3",
+      "cat",
+      "ls",
+      "mkdir",
+      "touch",
+      "echo",
+      "cd"
+    ],
+    "blocked_shell": [
+      "rm -rf /",
+      "sudo",
+      "chmod 777",
+      "curl",
+      "wget"
+    ]
+  },
+  "context": {
+    "include_files": [
+      "IMPLEMENTATION.md",
+      "DESIGN.md",
+      "HANDOFF.md",
+      "requirements.txt",
+      "pyproject.toml"
+    ],
+    "working_directory": "skills/computer-use-v3"
+  },
+  "rules": [
+    "Execute phases 1-8 in IMPLEMENTATION.md in strict order",
+    "Do NOT skip phases or jump ahead",
+    "Run verification command after each phase before committing",
+    "Commit after each phase with exact message from IMPLEMENTATION.md",
+    "Use explicit file paths - no relative paths",
+    "Do NOT ask clarifying questions - all requirements are in documentation",
+    "If blocked after 3 attempts, create BLOCKED.md and stop",
+    "Update PROGRESS.md after each phase",
+    "For VM operations: ssh computer-use-vm 'DISPLAY=:1 <command>'",
+    "Signal completion by creating IMPLEMENTATION_COMPLETE.md"
+  ]
+}
