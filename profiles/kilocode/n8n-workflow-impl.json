@@ -32,11 +32,18 @@
       "IMPLEMENTATION.md",
       "DESIGN.md",
       "WORKFLOW_SPEC.md",
-      "WEBHOOK_SPEC.md"
+      "WEBHOOK_SPEC.md",
+      "NFR_OVERRIDES.md"
+    ],
+    "nfr_files": [
+      "templates/nfr/COMMON.md",
+      "templates/nfr/n8n-workflow.md"
     ]
   },
   "rules": [
     "Execute phases in IMPLEMENTATION.md in strict order - do not skip",
+    "Follow NFR baseline patterns from templates/nfr/COMMON.md and templates/nfr/n8n-workflow.md",
+    "Respect NFR_OVERRIDES.md for project-specific deviations",
     "Build workflows as JSON files",
     "Use credential references, not actual values",
     "Implement error handling nodes",

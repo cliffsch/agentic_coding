@@ -27,7 +27,12 @@
     "include_files": [
       "DESIGN_REVIEW_CHECKLIST.md",
       "DESIGN.md",
-      "IMPLEMENTATION.md"
+      "IMPLEMENTATION.md",
+      "NFR_OVERRIDES.md"
+    ],
+    "nfr_files": [
+      "templates/nfr/COMMON.md",
+      "templates/nfr/python-ssh.md"
     ],
     "working_directory": "skills/computer-use-v3"
   },
@@ -38,6 +43,9 @@
   },
   "rules": [
     "Read DESIGN.md and IMPLEMENTATION.md completely",
+    "Load NFR baseline from templates/nfr/COMMON.md and templates/nfr/python-ssh.md",
+    "Check NFR_OVERRIDES.md for project-specific deviations",
+    "Validate NFR compliance: all Required NFRs must be addressed or justified in overrides",
     "Check DESIGN_REVIEW_CHECKLIST.md systematically - do not skip items",
     "Identify implicit requirements that need to be made explicit",
     "Verify every configuration setting has implementing code",

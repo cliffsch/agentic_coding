@@ -39,11 +39,18 @@
       "DESIGN.md",
       "FRONTEND_SPEC.md",
       "API_SPEC.md",
-      "DATABASE_SCHEMA.md"
+      "DATABASE_SCHEMA.md",
+      "NFR_OVERRIDES.md"
+    ],
+    "nfr_files": [
+      "templates/nfr/COMMON.md",
+      "templates/nfr/react-supabase.md"
     ]
   },
   "rules": [
     "Execute phases in IMPLEMENTATION.md in strict order - do not skip",
+    "Follow NFR baseline patterns from templates/nfr/COMMON.md and templates/nfr/react-supabase.md",
+    "Respect NFR_OVERRIDES.md for project-specific deviations",
     "Use TypeScript for all new code",
     "Follow component composition patterns",
     "Implement proper error boundaries",

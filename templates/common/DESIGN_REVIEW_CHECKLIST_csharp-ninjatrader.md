@@ -7,7 +7,34 @@
 - [ ] DESIGN.md exists and is readable
 - [ ] IMPLEMENTATION.md exists and is readable
 - [ ] INDICATOR_SPEC.md or STRATEGY_SPEC.md exists (if applicable)
+- [ ] NFR_OVERRIDES.md exists (may be empty)
 - [ ] All referenced files exist
+
+---
+
+## 0. NFR Compliance
+
+> Reference: `templates/nfr/COMMON.md` and `templates/nfr/ninjatrader.md`
+
+### 0.1 Common NFRs
+- [ ] **OPS-2**: Multi-level logging implemented (INFO/WARN/ERROR/CRITICAL via Print())
+- [ ] **OPS-3**: Debug logging toggle specified
+- [ ] **PRF-3**: Resource cleanup in Dispose() or State.Terminated
+- [ ] **SEC-1**: No hardcoded secrets (use NinjaScriptProperty for API keys)
+- [ ] **ALT-1**: Critical error notification mechanism (SendMail minimum)
+
+### 0.2 NinjaTrader-Specific NFRs
+- [ ] **NT-OPS-1**: Calculate mode appropriate (OnBarClose default)
+- [ ] **NT-OPS-2**: Dispose() pattern with event handler cleanup
+- [ ] **NT-PRF-1**: No per-bar allocations, reuse objects
+- [ ] **NT-PRF-2**: Indicators cached in DataLoaded state
+- [ ] **NT-ALT-1**: Email alerts configured for critical errors
+- [ ] **NT-ALT-3**: Alert deduplication to prevent spam
+
+### 0.3 NFR Overrides
+- [ ] All disabled NFRs justified in NFR_OVERRIDES.md
+- [ ] All modified NFRs documented with rationale
+- [ ] Any additional project-specific NFRs defined
 
 ---
 

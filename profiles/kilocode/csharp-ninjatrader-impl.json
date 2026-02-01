@@ -34,11 +34,18 @@
       "IMPLEMENTATION.md",
       "DESIGN.md",
       "INDICATOR_SPEC.md",
-      "STRATEGY_SPEC.md"
+      "STRATEGY_SPEC.md",
+      "NFR_OVERRIDES.md"
+    ],
+    "nfr_files": [
+      "templates/nfr/COMMON.md",
+      "templates/nfr/ninjatrader.md"
     ]
   },
   "rules": [
     "Execute phases in IMPLEMENTATION.md in strict order - do not skip",
+    "Follow NFR baseline patterns from templates/nfr/COMMON.md and templates/nfr/ninjatrader.md",
+    "Respect NFR_OVERRIDES.md for project-specific deviations",
     "Write code for desk check only - NO compilation on macOS",
     "Focus on logic correctness and proper NinjaTrader API usage",
     "Follow NinjaTrader naming conventions strictly",

@@ -42,11 +42,18 @@
       "IMPLEMENTATION.md",
       "DESIGN.md",
       "requirements.txt",
-      "pyproject.toml"
+      "pyproject.toml",
+      "NFR_OVERRIDES.md"
+    ],
+    "nfr_files": [
+      "templates/nfr/COMMON.md",
+      "templates/nfr/python-ssh.md"
     ]
   },
   "rules": [
     "Execute phases in IMPLEMENTATION.md in strict order - do not skip",
+    "Follow NFR baseline patterns from templates/nfr/COMMON.md and templates/nfr/python-ssh.md",
+    "Respect NFR_OVERRIDES.md for project-specific deviations",
     "Run verification command after each phase before committing",
     "Commit after each phase with exact message from IMPLEMENTATION.md",
     "Update PROGRESS.md after each phase",

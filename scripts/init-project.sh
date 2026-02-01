@@ -107,12 +107,39 @@ fi
 log_info "Copying common templates..."
 cp "${TEMPLATES_DIR}/common"/*.md "$PROJECT_DIR/" 2>/dev/null || true
 
+# Copy NFR baseline and create override file
+log_info "Setting up NFR framework..."
+mkdir -p "$PROJECT_DIR/nfr"
+cp "${TEMPLATES_DIR}/nfr/COMMON.md" "$PROJECT_DIR/nfr/" 2>/dev/null || true
+
+# Copy platform-specific NFR
+case "$PLATFORM" in
+    ninjatrader)
+        cp "${TEMPLATES_DIR}/nfr/ninjatrader.md" "$PROJECT_DIR/nfr/" 2>/dev/null || true
+        ;;
+    react-supabase)
+        cp "${TEMPLATES_DIR}/nfr/react-supabase.md" "$PROJECT_DIR/nfr/" 2>/dev/null || true
+        ;;
+    python-ssh)
+        cp "${TEMPLATES_DIR}/nfr/python-ssh.md" "$PROJECT_DIR/nfr/" 2>/dev/null || true
+        ;;
+    n8n)
+        cp "${TEMPLATES_DIR}/nfr/n8n-workflow.md" "$PROJECT_DIR/nfr/" 2>/dev/null || true
+        ;;
+esac
+
+# Create NFR_OVERRIDES.md from template
+if [ -f "${TEMPLATES_DIR}/project/NFR_OVERRIDES.template.md" ]; then
+    cp "${TEMPLATES_DIR}/project/NFR_OVERRIDES.template.md" "$PROJECT_DIR/NFR_OVERRIDES.md"
+fi
+
 # Replace placeholders in templates
 log_info "Customizing templates..."
 DATE=$(date +"%Y-%m-%d")
 AUTHOR="${USER:-$(whoami)}"
 
-for file in "$PROJECT_DIR"/*.md; do
+# Process all .md files including NFR_OVERRIDES.md
+for file in "$PROJECT_DIR"/*.md "$PROJECT_DIR/nfr"/*.md; do
     [ -f "$file" ] || continue
 
     # macOS sed requires different syntax
@@ -140,29 +167,33 @@ case "$PLATFORM" in
         log_info "NinjaTrader project initialized"
         log_info "Next steps:"
         echo "  1. Edit DESIGN.md with your indicator/strategy requirements"
-        echo "  2. Run a design session with Claude Code"
-        echo "  3. Hand off to Kilocode: run-agentic-workflow.sh -p $PROJECT_DIR"
+        echo "  2. Review NFR baseline in nfr/ folder"
+        echo "  3. Run a design session with Claude Code (includes NFR discussion)"
+        echo "  4. Hand off to Kilocode: run-agentic-workflow.sh -p $PROJECT_DIR"
         ;;
     react-supabase)
         log_info "React/Supabase project initialized"
         log_info "Next steps:"
         echo "  1. Run: npm create vite@latest . -- --template react-ts"
         echo "  2. Edit DESIGN.md with your app requirements"
-        echo "  3. Run a design session with Claude Code"
+        echo "  3. Review NFR baseline in nfr/ folder"
+        echo "  4. Run a design session with Claude Code (includes NFR discussion)"
         ;;
     python-ssh)
         log_info "Python project initialized"
         log_info "Next steps:"
         echo "  1. Create pyproject.toml or requirements.txt"
         echo "  2. Edit DESIGN.md with your script requirements"
-        echo "  3. Run a design session with Claude Code"
+        echo "  3. Review NFR baseline in nfr/ folder"
+        echo "  4. Run a design session with Claude Code (includes NFR discussion)"
         ;;
     n8n)
         log_info "n8n workflow project initialized"
         mkdir -p "$PROJECT_DIR/workflows"
         log_info "Next steps:"
         echo "  1. Edit DESIGN.md with your workflow requirements"
-        echo "  2. Run a design session with Claude Code"
+        echo "  2. Review NFR baseline in nfr/ folder"
+        echo "  3. Run a design session with Claude Code (includes NFR discussion)"
         ;;
 esac
 

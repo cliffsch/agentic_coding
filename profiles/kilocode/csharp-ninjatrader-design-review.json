@@ -29,7 +29,12 @@
       "DESIGN.md",
       "IMPLEMENTATION.md",
       "INDICATOR_SPEC.md",
-      "STRATEGY_SPEC.md"
+      "STRATEGY_SPEC.md",
+      "NFR_OVERRIDES.md"
+    ],
+    "nfr_files": [
+      "templates/nfr/COMMON.md",
+      "templates/nfr/ninjatrader.md"
     ]
   },
   "review": {
@@ -39,6 +44,9 @@
   },
   "rules": [
     "Read DESIGN.md, IMPLEMENTATION.md, and any SPEC files completely",
+    "Load NFR baseline from templates/nfr/COMMON.md and templates/nfr/ninjatrader.md",
+    "Check NFR_OVERRIDES.md for project-specific deviations",
+    "Validate NFR compliance: all Required NFRs must be addressed or justified in overrides",
     "Check DESIGN_REVIEW_CHECKLIST.md systematically - do not skip items",
     "Verify Indicator/Strategy inherits from proper base class",
     "Verify OnBarUpdate() method is implemented correctly",

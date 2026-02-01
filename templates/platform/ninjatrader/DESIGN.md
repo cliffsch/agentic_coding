@@ -28,8 +28,20 @@
 
 ### Non-Functional Requirements
 
-1. **NFR-1**: Performance - Must not cause lag during real-time trading
-2. **NFR-2**: Memory - Must properly dispose resources
+> Baseline NFRs from `templates/nfr/COMMON.md` and `templates/nfr/ninjatrader.md` apply.
+> Document any overrides in `NFR_OVERRIDES.md`.
+
+| Category | Key Requirements | Status |
+|----------|-----------------|--------|
+| **Operability** | Multi-level logging, debug toggle, `Calculate.OnBarClose` default | [ ] |
+| **Performance** | No per-bar allocations, indicator caching, `Dispose()` cleanup | [ ] |
+| **Alerting** | Email alerts (`SendMail()`), optional Telegram, alert deduplication | [ ] |
+| **Security** | No hardcoded API keys, use NinjaScriptProperty for secrets | [ ] |
+
+**Project-Specific NFRs:**
+1. {Additional NFR if needed}
+
+**NFR Overrides:** {Reference NFR_OVERRIDES.md if deviations exist}
 
 ## Architecture
 

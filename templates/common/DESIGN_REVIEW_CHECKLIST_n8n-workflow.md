@@ -8,7 +8,37 @@
 - [ ] IMPLEMENTATION.md exists and is readable
 - [ ] WORKFLOW_SPEC.md exists (if applicable)
 - [ ] WEBHOOK_SPEC.md exists (if applicable)
+- [ ] NFR_OVERRIDES.md exists (may be empty)
 - [ ] All referenced files exist
+
+---
+
+## 0. NFR Compliance
+
+> Reference: `templates/nfr/COMMON.md` and `templates/nfr/n8n-workflow.md`
+
+### 0.1 Common NFRs
+- [ ] **OPS-2**: Logging implemented via Set nodes or logging workflow
+- [ ] **SEC-1**: No inline credentials (use n8n credential store)
+- [ ] **ALT-1**: Error notification mechanism configured
+
+### 0.2 n8n-Specific NFRs
+- [ ] **N8-OPS-1**: Workflow versioning in name/description
+- [ ] **N8-OPS-2**: Documentation sticky note at start
+- [ ] **N8-ALT-1**: Error Trigger workflow configured
+- [ ] **N8-ALT-2**: Dedicated error handler workflow
+- [ ] **N8-SEC-1**: All credentials via credential store
+- [ ] **N8-SEC-2**: Webhook authentication configured
+- [ ] **N8-SEC-3**: Sensitive data filtered from logs
+- [ ] **N8-PRF-1**: Rate limiting with Wait nodes
+- [ ] **N8-PRF-2**: Batch processing for large datasets
+- [ ] **N8-PRF-3**: HTTP request timeouts configured
+- [ ] **N8-MNT-1**: Descriptive node names (not defaults)
+
+### 0.3 NFR Overrides
+- [ ] All disabled NFRs justified in NFR_OVERRIDES.md
+- [ ] All modified NFRs documented with rationale
+- [ ] Any additional project-specific NFRs defined
 
 ---
 

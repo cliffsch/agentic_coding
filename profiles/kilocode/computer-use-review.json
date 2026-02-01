@@ -36,7 +36,12 @@
       "REVIEW_CHECKLIST.md",
       "IMPLEMENTATION.md",
       "DESIGN.md",
-      "IMPLEMENTATION_COMPLETE.md"
+      "IMPLEMENTATION_COMPLETE.md",
+      "NFR_OVERRIDES.md"
+    ],
+    "nfr_files": [
+      "templates/nfr/COMMON.md",
+      "templates/nfr/python-ssh.md"
     ],
     "working_directory": "skills/computer-use-v3"
   },
@@ -48,6 +53,8 @@
   },
   "rules": [
     "Validate implementation against IMPLEMENTATION.md specifications",
+    "Verify NFR compliance against templates/nfr/COMMON.md and templates/nfr/python-ssh.md",
+    "Check NFR_OVERRIDES.md for justified deviations",
     "Run all unit tests: pytest tests/ -v",
     "Run E2E tests on VM: ssh computer-use-vm 'DISPLAY=:1 python -m computer_use ...'",
     "Verify all commits match specified messages from IMPLEMENTATION.md",

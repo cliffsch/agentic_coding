@@ -43,12 +43,19 @@
       "DESIGN.md",
       "HANDOFF.md",
       "requirements.txt",
-      "pyproject.toml"
+      "pyproject.toml",
+      "NFR_OVERRIDES.md"
+    ],
+    "nfr_files": [
+      "templates/nfr/COMMON.md",
+      "templates/nfr/python-ssh.md"
     ],
     "working_directory": "skills/computer-use-v3"
   },
   "rules": [
     "Execute phases 1-8 in IMPLEMENTATION.md in strict order",
+    "Follow NFR baseline patterns from templates/nfr/COMMON.md and templates/nfr/python-ssh.md",
+    "Respect NFR_OVERRIDES.md for project-specific deviations",
     "Do NOT skip phases or jump ahead",
     "Run verification command after each phase before committing",
     "Commit after each phase with exact message from IMPLEMENTATION.md",

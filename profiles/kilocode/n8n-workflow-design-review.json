@@ -28,7 +28,12 @@
       "DESIGN.md",
       "IMPLEMENTATION.md",
       "WORKFLOW_SPEC.md",
-      "WEBHOOK_SPEC.md"
+      "WEBHOOK_SPEC.md",
+      "NFR_OVERRIDES.md"
+    ],
+    "nfr_files": [
+      "templates/nfr/COMMON.md",
+      "templates/nfr/n8n-workflow.md"
     ]
   },
   "review": {
@@ -38,6 +43,9 @@
   },
   "rules": [
     "Read DESIGN.md, IMPLEMENTATION.md, and all SPEC files completely",
+    "Load NFR baseline from templates/nfr/COMMON.md and templates/nfr/n8n-workflow.md",
+    "Check NFR_OVERRIDES.md for project-specific deviations",
+    "Validate NFR compliance: all Required NFRs must be addressed or justified in overrides",
     "Check DESIGN_REVIEW_CHECKLIST.md systematically - do not skip items",
     "Verify workflow JSON structure is valid",
     "Check credential references use proper naming",

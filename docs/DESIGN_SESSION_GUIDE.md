@@ -27,16 +27,20 @@ A **Design Session** is an interactive collaboration between you and Claude Code
 │  2. ARCHITECTURE EXPLORATION                                        │
 │     └─ Claude reads existing code → proposes approach               │
 │                                                                      │
-│  3. DESIGN DOCUMENT GENERATION                                      │
-│     └─ Claude creates DESIGN.md from template                       │
+│  3. NFR DISCUSSION                                                  │
+│     └─ Claude loads platform NFRs → discusses overrides with user   │
+│     └─ Creates NFR_OVERRIDES.md if deviations needed                │
 │                                                                      │
-│  4. IMPLEMENTATION PLANNING                                         │
+│  4. DESIGN DOCUMENT GENERATION                                      │
+│     └─ Claude creates DESIGN.md from template (includes NFR section)│
+│                                                                      │
+│  5. IMPLEMENTATION PLANNING                                         │
 │     └─ Claude creates IMPLEMENTATION.md with phases                 │
 │                                                                      │
-│  5. VALIDATION                                                       │
-│     └─ Claude checks against REVIEW_CHECKLIST.md                    │
+│  6. VALIDATION                                                       │
+│     └─ Claude checks against REVIEW_CHECKLIST.md (includes NFRs)    │
 │                                                                      │
-│  6. HANDOFF PREPARATION                                             │
+│  7. HANDOFF PREPARATION                                             │
 │     └─ Claude creates DESIGN_REVIEW_START.md                        │
 │                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
@@ -102,6 +106,60 @@ These phrases help Claude understand your intent:
 | "Validate the design" | Check against platform checklist |
 | "Prepare for handoff" | Create DESIGN_REVIEW_START.md |
 | "I want to hand this to Kilocode" | Signal autonomous phase coming |
+
+## NFR Discussion Phase
+
+The NFR (Non-Functional Requirements) discussion ensures operability, performance, security, and alerting are addressed before implementation.
+
+### NFR Framework Structure
+
+```
+templates/nfr/
+├── COMMON.md              # Cross-platform NFRs (all projects)
+├── ninjatrader.md         # NinjaTrader-specific NFRs
+├── react-supabase.md      # React/Supabase-specific NFRs
+├── python-ssh.md          # Python/SSH-specific NFRs
+└── n8n-workflow.md        # n8n-specific NFRs
+```
+
+### NFR Categories
+
+| Category | Focus | Examples |
+|----------|-------|----------|
+| **Operability (OPS)** | Running the system | Logging, debug toggle, health checks |
+| **Maintainability (MNT)** | Code quality | Naming conventions, no magic numbers |
+| **Performance (PRF)** | Efficiency | Log rotation, lazy init, cleanup |
+| **Security (SEC)** | Protection | No hardcoded secrets, input validation |
+| **User Experience (UX)** | End users | Graceful errors, loading states |
+| **Alerting (ALT)** | Operator awareness | Critical notifications, throttling |
+
+### During Design Session
+
+1. **Load baseline**: Claude reads `COMMON.md` + platform-specific NFR file
+2. **Review with user**: Discuss which NFRs apply, any needed overrides
+3. **Document overrides**: Create `NFR_OVERRIDES.md` if deviations needed
+4. **Include in DESIGN.md**: NFR section summarizes applicable requirements
+
+### Example NFR Discussion
+
+```
+Claude: I've loaded the NFR baseline for NinjaTrader. Key requirements:
+- Multi-level logging via Print()
+- Email alerts for critical errors (SendMail)
+- Calculate.OnBarClose default (performance)
+- Dispose() cleanup for resources
+
+Do any of these need modification for your project?
+
+User: This is a simple indicator, I don't think we need the email alerts.
+
+Claude: I'll note that in NFR_OVERRIDES.md:
+- NT-ALT-1 disabled: Simple indicator, no critical errors expected
+
+Do you want Telegram alerts as an alternative, or skip alerting entirely?
+```
+
+---
 
 ## Platform Templates
 
@@ -207,10 +265,11 @@ A complete design session produces:
 
 | File | Purpose |
 |------|---------|
-| `DESIGN.md` | Architecture and specifications |
+| `DESIGN.md` | Architecture and specifications (includes NFR section) |
 | `IMPLEMENTATION.md` | Phased implementation plan |
+| `NFR_OVERRIDES.md` | Project-specific NFR deviations (if any) |
 | `DESIGN_REVIEW_START.md` | Instructions for review agent |
-| `DESIGN_REVIEW_CHECKLIST.md` | Platform-specific checklist |
+| `DESIGN_REVIEW_CHECKLIST.md` | Platform-specific checklist (includes NFR compliance) |
 
 ## Tips for Effective Design Sessions
 

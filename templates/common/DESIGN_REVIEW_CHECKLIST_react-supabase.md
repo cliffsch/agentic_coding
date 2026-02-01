@@ -9,7 +9,39 @@
 - [ ] FRONTEND_SPEC.md exists (if applicable)
 - [ ] API_SPEC.md exists (if applicable)
 - [ ] DATABASE_SCHEMA.md exists (if applicable)
+- [ ] NFR_OVERRIDES.md exists (may be empty)
 - [ ] All referenced files exist
+
+---
+
+## 0. NFR Compliance
+
+> Reference: `templates/nfr/COMMON.md` and `templates/nfr/react-supabase.md`
+
+### 0.1 Common NFRs
+- [ ] **OPS-2**: Multi-level logging implemented
+- [ ] **OPS-3**: Debug logging toggle via environment variable
+- [ ] **PRF-3**: Resource cleanup (subscriptions, listeners)
+- [ ] **SEC-1**: No hardcoded secrets (environment variables only)
+- [ ] **SEC-2**: Input validation at boundaries
+- [ ] **UX-1**: Graceful error handling with user-friendly messages
+- [ ] **ALT-1**: Critical error notification mechanism
+
+### 0.2 React/Supabase-Specific NFRs
+- [ ] **RS-OPS-1**: Structured logging implemented
+- [ ] **RS-OPS-2**: Error boundaries at route level minimum
+- [ ] **RS-OPS-3**: All config via environment variables
+- [ ] **RS-UX-2**: Toast notification system for feedback
+- [ ] **RS-UX-3**: Loading states for async operations
+- [ ] **RS-SEC-1**: RLS policies on all tables
+- [ ] **RS-SEC-2**: Auth state validation on protected routes
+- [ ] **RS-PRF-1**: React Query caching configured
+- [ ] **RS-PRF-3**: Realtime subscription cleanup on unmount
+
+### 0.3 NFR Overrides
+- [ ] All disabled NFRs justified in NFR_OVERRIDES.md
+- [ ] All modified NFRs documented with rationale
+- [ ] Any additional project-specific NFRs defined
 
 ---
 

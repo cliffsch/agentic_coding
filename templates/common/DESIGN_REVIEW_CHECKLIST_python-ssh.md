@@ -7,7 +7,38 @@
 - [ ] DESIGN.md exists and is readable
 - [ ] IMPLEMENTATION.md exists and is readable
 - [ ] requirements.txt or pyproject.toml exists
+- [ ] NFR_OVERRIDES.md exists (may be empty)
 - [ ] All referenced files exist
+
+---
+
+## 0. NFR Compliance
+
+> Reference: `templates/nfr/COMMON.md` and `templates/nfr/python-ssh.md`
+
+### 0.1 Common NFRs
+- [ ] **OPS-2**: Multi-level logging implemented (INFO/WARN/ERROR/CRITICAL)
+- [ ] **OPS-3**: Debug logging toggle via LOG_LEVEL env var
+- [ ] **PRF-1**: Log rotation/retention configured
+- [ ] **PRF-3**: Resource cleanup on shutdown
+- [ ] **SEC-1**: No hardcoded secrets (environment variables only)
+- [ ] **SEC-2**: Input validation at boundaries (CLI args, config)
+- [ ] **ALT-1**: Critical error notification mechanism
+
+### 0.2 Python/SSH-Specific NFRs
+- [ ] **PY-OPS-1**: Standard logging module with configurable level
+- [ ] **PY-OPS-2**: SIGTERM/SIGINT signal handling
+- [ ] **PY-OPS-3**: LOG_LEVEL environment variable support
+- [ ] **PY-ALT-1**: Operator notification (Telegram/email/webhook)
+- [ ] **PY-ALT-2**: Alert throttling implemented
+- [ ] **PY-PRF-1**: Graceful shutdown with context managers
+- [ ] **PY-SEC-1**: Secrets from environment or secrets manager
+- [ ] **PY-SSH-1**: Deployment documentation complete
+
+### 0.3 NFR Overrides
+- [ ] All disabled NFRs justified in NFR_OVERRIDES.md
+- [ ] All modified NFRs documented with rationale
+- [ ] Any additional project-specific NFRs defined
 
 ---
 
