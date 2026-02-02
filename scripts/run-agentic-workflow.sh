@@ -1,9 +1,10 @@
 #!/bin/bash
-# Agentic Workflow Runner v4.0
+# Agentic Workflow Runner v4.1
 # Multi-Platform, Multi-Machine Orchestration
 #
 # Features:
 # - Platform detection (ninjatrader, react-supabase, python-ssh, n8n)
+# - Project-level rules integration (.kilorules, .cursorrules, .claude/)
 # - Remote execution support (Windows NT8, VMs)
 # - Compilation feedback loop
 # - MCP integration
@@ -59,6 +60,218 @@ log_error()    { echo -e "${RED}[ERROR]${NC} $1"; }
 log_phase()    { echo -e "${CYAN}[PHASE]${NC} $1"; }
 log_workflow() { echo -e "${MAGENTA}[WORKFLOW]${NC} $1"; }
 log_remote()   { echo -e "${MAGENTA}[REMOTE]${NC} $1"; }
+
+# =============================================================================
+# PROJECT RULES LOADING
+# =============================================================================
+
+# Global variables for loaded rules
+PROJECT_RULES=""
+PROJECT_RULES_SOURCE=""
+
+load_project_rules() {
+    local dir="${1:-$PROJECT_DIR}"
+    local phase="${2:-general}"
+    PROJECT_RULES=""
+    PROJECT_RULES_SOURCE=""
+
+    # Priority 1: .kilorules (Kilocode-specific rules)
+    if [ -f "$dir/.kilorules" ]; then
+        PROJECT_RULES_SOURCE=".kilorules"
+        log_info "Loading rules from .kilorules"
+        PROJECT_RULES=$(cat "$dir/.kilorules")
+        return 0
+    fi
+
+    # Priority 2: .cursorrules (Claude/general rules - user mentioned they use this for Claude)
+    if [ -f "$dir/.cursorrules" ]; then
+        PROJECT_RULES_SOURCE=".cursorrules"
+        log_info "Loading rules from .cursorrules"
+        PROJECT_RULES=$(cat "$dir/.cursorrules")
+        return 0
+    fi
+
+    # Priority 3: .claude/ directory with modular rules
+    if [ -d "$dir/.claude" ]; then
+        PROJECT_RULES_SOURCE=".claude/"
+        log_info "Loading rules from .claude/ directory"
+
+        # Load main rules file if exists
+        local rules_content=""
+        for rules_file in "$dir/.claude/CLAUDE.md" "$dir/.claude/CLAUDE_OPTIMIZED.md" "$dir/.claude/rules.md"; do
+            if [ -f "$rules_file" ]; then
+                rules_content=$(cat "$rules_file")
+                break
+            fi
+        done
+
+        # Load phase-specific or domain-specific rules
+        case "$phase" in
+            design-review)
+                [ -f "$dir/.claude/workflows/design_review.md" ] && \
+                    rules_content="$rules_content"$'\n\n'"$(cat "$dir/.claude/workflows/design_review.md")"
+                ;;
+            implementation)
+                [ -f "$dir/.claude/workflows/code_generation.md" ] && \
+                    rules_content="$rules_content"$'\n\n'"$(cat "$dir/.claude/workflows/code_generation.md")"
+                ;;
+            code-review)
+                [ -f "$dir/.claude/workflows/code_review.md" ] && \
+                    rules_content="$rules_content"$'\n\n'"$(cat "$dir/.claude/workflows/code_review.md")"
+                ;;
+        esac
+
+        # Load platform-specific rules based on workflow type
+        case "$WORKFLOW_TYPE" in
+            ninjatrader)
+                [ -f "$dir/.claude/nt8/core.md" ] && \
+                    rules_content="$rules_content"$'\n\n'"$(cat "$dir/.claude/nt8/core.md")"
+                ;;
+            react-supabase|react-vite)
+                [ -f "$dir/.claude/react/core.md" ] && \
+                    rules_content="$rules_content"$'\n\n'"$(cat "$dir/.claude/react/core.md")"
+                ;;
+            python-ssh)
+                [ -f "$dir/.claude/python/core.md" ] && \
+                    rules_content="$rules_content"$'\n\n'"$(cat "$dir/.claude/python/core.md")"
+                ;;
+        esac
+
+        PROJECT_RULES="$rules_content"
+        return 0
+    fi
+
+    # Priority 4: .kilo/ directory (parallel structure for Kilocode)
+    if [ -d "$dir/.kilo" ]; then
+        PROJECT_RULES_SOURCE=".kilo/"
+        log_info "Loading rules from .kilo/ directory"
+
+        local rules_content=""
+        [ -f "$dir/.kilo/README.md" ] && rules_content=$(cat "$dir/.kilo/README.md")
+
+        # Load phase-specific workflows
+        case "$phase" in
+            design-review)
+                [ -f "$dir/.kilo/workflows/design_review.md" ] && \
+                    rules_content="$rules_content"$'\n\n'"$(cat "$dir/.kilo/workflows/design_review.md")"
+                ;;
+            implementation)
+                [ -f "$dir/.kilo/workflows/code_generation.md" ] && \
+                    rules_content="$rules_content"$'\n\n'"$(cat "$dir/.kilo/workflows/code_generation.md")"
+                ;;
+            code-review)
+                [ -f "$dir/.kilo/workflows/code_review.md" ] && \
+                    rules_content="$rules_content"$'\n\n'"$(cat "$dir/.kilo/workflows/code_review.md")"
+                ;;
+        esac
+
+        # Load platform-specific rules
+        case "$WORKFLOW_TYPE" in
+            ninjatrader)
+                [ -f "$dir/.kilo/nt8/core.md" ] && \
+                    rules_content="$rules_content"$'\n\n'"$(cat "$dir/.kilo/nt8/core.md")"
+                ;;
+        esac
+
+        PROJECT_RULES="$rules_content"
+        return 0
+    fi
+
+    # Priority 5: Fall back to profile JSON from agentic_coding system
+    load_profile_rules "$phase"
+}
+
+load_profile_rules() {
+    local phase="${1:-general}"
+    local profile_name=""
+
+    # Map workflow type and phase to profile name
+    case "$WORKFLOW_TYPE" in
+        ninjatrader) profile_name="csharp-ninjatrader" ;;
+        react-supabase) profile_name="react-supabase" ;;
+        python-ssh) profile_name="python-ssh" ;;
+        n8n) profile_name="n8n-workflow" ;;
+        *) profile_name="python-ssh" ;;
+    esac
+
+    case "$phase" in
+        design-review) profile_name="${profile_name}-design-review" ;;
+        implementation) profile_name="${profile_name}-impl" ;;
+        code-review) profile_name="${profile_name}-review" ;;
+    esac
+
+    local profile_file="${PROFILES_DIR}/${profile_name}.json"
+
+    if [ -f "$profile_file" ]; then
+        PROJECT_RULES_SOURCE="profile:${profile_name}"
+        log_info "Loading rules from profile: $profile_name"
+
+        # Extract rules array from JSON and format as markdown
+        if command -v jq &> /dev/null; then
+            PROJECT_RULES=$(jq -r '.rules[]? // empty' "$profile_file" 2>/dev/null | while read -r rule; do
+                echo "- $rule"
+            done)
+        else
+            # Fallback: simple grep extraction if jq not available
+            PROJECT_RULES=$(grep -oP '"[^"]+(?=",?)' "$profile_file" 2>/dev/null | \
+                grep -v "name\|description\|provider\|model_id" | \
+                sed 's/^"//;s/"$//' | \
+                while read -r rule; do echo "- $rule"; done)
+        fi
+        return 0
+    fi
+
+    log_warn "No project rules or profile found for $phase"
+    PROJECT_RULES=""
+}
+
+# Build the system prompt with project rules
+build_agent_prompt() {
+    local role="$1"
+    local phase="$2"
+    local signal_file="$3"
+
+    # Load rules for this phase
+    load_project_rules "$PROJECT_DIR" "$phase"
+
+    local prompt="You are a ${role} agent."
+    prompt="$prompt Read ${signal_file} and follow instructions."
+
+    if [ -n "$PROJECT_RULES" ]; then
+        # Truncate rules if too long (keep under ~4000 chars for system prompt)
+        local rules_preview="${PROJECT_RULES:0:4000}"
+        if [ ${#PROJECT_RULES} -gt 4000 ]; then
+            rules_preview="${rules_preview}..."
+            log_warn "Rules truncated (${#PROJECT_RULES} chars) - full rules in project files"
+        fi
+        prompt="$prompt"$'\n\n'"## Project Rules (from $PROJECT_RULES_SOURCE)"$'\n'"$rules_preview"
+    fi
+
+    echo "$prompt"
+}
+
+# Get NFR (Non-Functional Requirements) content for the platform
+get_nfr_content() {
+    local nfr_content=""
+
+    # Load common NFRs
+    if [ -f "${TEMPLATES_DIR}/nfr/COMMON.md" ]; then
+        nfr_content=$(cat "${TEMPLATES_DIR}/nfr/COMMON.md")
+    fi
+
+    # Load platform-specific NFRs
+    local platform_nfr="${TEMPLATES_DIR}/nfr/${WORKFLOW_TYPE}.md"
+    if [ -f "$platform_nfr" ]; then
+        nfr_content="$nfr_content"$'\n\n'"$(cat "$platform_nfr")"
+    fi
+
+    # Check for project-level NFR overrides
+    if [ -f "$PROJECT_DIR/NFR_OVERRIDES.md" ]; then
+        nfr_content="$nfr_content"$'\n\n'"## Project NFR Overrides"$'\n'"$(cat "$PROJECT_DIR/NFR_OVERRIDES.md")"
+    fi
+
+    echo "$nfr_content"
+}
 
 # =============================================================================
 # PLATFORM DETECTION
@@ -262,6 +475,13 @@ run_design_review() {
 
     log_info "Documents: $documents"
 
+    # Load project rules for this phase
+    load_project_rules "$PROJECT_DIR" "design-review"
+    [ -n "$PROJECT_RULES_SOURCE" ] && log_info "Rules: $PROJECT_RULES_SOURCE"
+
+    # Get NFR content
+    local nfr_content=$(get_nfr_content)
+
     # Check for existing DESIGN_REVIEW_START.md or create one
     if [ ! -f "$PROJECT_DIR/DESIGN_REVIEW_START.md" ]; then
         # Use template if available
@@ -275,6 +495,7 @@ run_design_review() {
 **Project**: $(basename "$PROJECT_DIR")
 **Platform**: $WORKFLOW_TYPE
 **Timestamp**: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+**Rules Source**: ${PROJECT_RULES_SOURCE:-defaults}
 
 ## Documents to Review
 
@@ -284,8 +505,15 @@ $(for doc in $documents; do echo "- $doc"; done)
 
 Read all documents and validate against DESIGN_REVIEW_CHECKLIST.md.
 
+### Critical Checks
+- Every config setting has implementing code that USES it
+- Every "cleanup" or "retention" mention has cleanup logic
+- All cross-document references are valid
+- No implicit requirements left unspecified
+
+### Decision
 - If APPROVED: Create DESIGN_APPROVED.md
-- If ISSUES: Create DESIGN_ISSUES.md
+- If ISSUES: Create DESIGN_ISSUES.md with specific problems
 EOF
         fi
         log_success "Created DESIGN_REVIEW_START.md"
@@ -293,12 +521,17 @@ EOF
 
     # Ensure checklist exists
     if [ ! -f "$PROJECT_DIR/DESIGN_REVIEW_CHECKLIST.md" ]; then
+        # Try platform-specific first
         local checklist="${TEMPLATES_DIR}/platform/${WORKFLOW_TYPE}/REVIEW_CHECKLIST.md"
+        [ ! -f "$checklist" ] && checklist="${TEMPLATES_DIR}/common/DESIGN_REVIEW_CHECKLIST_${WORKFLOW_TYPE}.md"
         if [ -f "$checklist" ]; then
             cp "$checklist" "$PROJECT_DIR/DESIGN_REVIEW_CHECKLIST.md"
             log_info "Copied platform checklist"
         fi
     fi
+
+    # Build the agent prompt with project rules
+    local agent_prompt=$(build_agent_prompt "design review" "design-review" "DESIGN_REVIEW_START.md")
 
     # Run Kilocode
     log_info "Starting Kilocode design review..."
@@ -309,11 +542,11 @@ EOF
     cd "$PROJECT_DIR"
     if [ "$VERBOSE" -eq 1 ]; then
         kilocode $kilocode_args \
-            --append-system-prompt "You are a design review agent. Read DESIGN_REVIEW_START.md and follow instructions." \
+            --append-system-prompt "$agent_prompt" \
             "Begin design review"
     else
         kilocode $kilocode_args \
-            --append-system-prompt "You are a design review agent. Read DESIGN_REVIEW_START.md and follow instructions." \
+            --append-system-prompt "$agent_prompt" \
             "Begin design review" &
 
         local pid=$!
@@ -357,6 +590,42 @@ run_implementation() {
         return 1
     fi
 
+    # Load project rules for this phase
+    load_project_rules "$PROJECT_DIR" "implementation"
+    [ -n "$PROJECT_RULES_SOURCE" ] && log_info "Rules: $PROJECT_RULES_SOURCE"
+
+    # Get platform-specific implementation instructions
+    local platform_instructions=""
+    case "$WORKFLOW_TYPE" in
+        ninjatrader)
+            platform_instructions="
+### NinjaTrader Implementation Rules
+- Write code for desk check only - NO compilation on macOS
+- Focus on logic correctness and NT API usage
+- Follow NinjaTrader naming conventions strictly
+- Include XML documentation comments
+- Handle all State transitions properly (SetDefaults, Configure, DataLoaded)
+- Implement proper Dispose() patterns"
+            ;;
+        react-supabase)
+            platform_instructions="
+### React/Supabase Implementation Rules
+- Use TypeScript for all new code
+- Follow component composition patterns
+- Implement proper error boundaries
+- Use React Query for server state management
+- Implement proper loading and error states"
+            ;;
+        python-ssh)
+            platform_instructions="
+### Python Implementation Rules
+- Follow PEP 8 style guidelines
+- Use type hints for function signatures
+- Include docstrings for public functions
+- Write unit tests alongside implementation"
+            ;;
+    esac
+
     # Create implementation start signal
     cat > "$PROJECT_DIR/IMPLEMENTATION_START.md" << EOF
 # Implementation Start Signal
@@ -364,19 +633,32 @@ run_implementation() {
 **Project**: $(basename "$PROJECT_DIR")
 **Platform**: $WORKFLOW_TYPE
 **Timestamp**: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+**Rules Source**: ${PROJECT_RULES_SOURCE:-defaults}
 
 ## Instructions
 
 Read IMPLEMENTATION.md and execute phases in order.
 
-- Run verification after each phase
-- Commit after each phase
-- Update PROGRESS.md
-- If blocked after 3 attempts: Create BLOCKED.md
-- When complete: Create IMPLEMENTATION_COMPLETE.md
+### Critical Rules
+- Execute phases IN ORDER - do not skip
+- Run verification after each phase before committing
+- Commit after each phase with EXACT message from IMPLEMENTATION.md
+- Update PROGRESS.md after each phase
+- Use explicit file paths - no relative paths
+- Do NOT ask clarifying questions - all requirements are documented
+- If blocked after 3 attempts: Create BLOCKED.md and stop
+$platform_instructions
+
+### Completion Signal
+When all phases complete successfully, create IMPLEMENTATION_COMPLETE.md with summary.
+
+BEGIN NOW: Read IMPLEMENTATION.md and start Phase 1.
 EOF
 
     log_success "Created IMPLEMENTATION_START.md"
+
+    # Build the agent prompt with project rules
+    local agent_prompt=$(build_agent_prompt "implementation" "implementation" "IMPLEMENTATION_START.md")
 
     # Run Kilocode
     local kilocode_args="--mode code"
@@ -386,11 +668,11 @@ EOF
 
     if [ "$VERBOSE" -eq 1 ]; then
         kilocode $kilocode_args \
-            --append-system-prompt "You are an implementation agent. Read IMPLEMENTATION_START.md and follow instructions." \
+            --append-system-prompt "$agent_prompt" \
             "Begin implementation"
     else
         kilocode $kilocode_args \
-            --append-system-prompt "You are an implementation agent. Read IMPLEMENTATION_START.md and follow instructions." \
+            --append-system-prompt "$agent_prompt" \
             "Begin implementation" &
 
         local pid=$!
@@ -439,6 +721,45 @@ run_code_review() {
         return 1
     fi
 
+    # Load project rules for this phase
+    load_project_rules "$PROJECT_DIR" "code-review"
+    [ -n "$PROJECT_RULES_SOURCE" ] && log_info "Rules: $PROJECT_RULES_SOURCE"
+
+    # Get platform-specific review instructions
+    local platform_review=""
+    case "$WORKFLOW_TYPE" in
+        ninjatrader)
+            platform_review="
+### NinjaTrader Code Review
+- Desk check code logic (no compilation on Mac)
+- Verify NT API usage is correct
+- Check State management transitions
+- Validate input parameter handling
+- Review Dispose() implementation
+- Check for memory leaks (event handlers)
+- Verify plot updates are efficient"
+            ;;
+        react-supabase)
+            platform_review="
+### React/Supabase Code Review
+- Run TypeScript checks: npm run type-check
+- Run linter: npm run lint
+- Build verification: npm run build
+- Check Supabase type safety
+- Verify API error handling
+- Review component prop types
+- Check for security issues (XSS, injection)"
+            ;;
+        python-ssh)
+            platform_review="
+### Python Code Review
+- Run all tests: pytest tests/ -v
+- Check type hints with mypy
+- Verify PEP 8 compliance
+- Review error handling"
+            ;;
+    esac
+
     # Create code review start signal
     cat > "$PROJECT_DIR/REVIEW_START.md" << EOF
 # Code Review Start Signal
@@ -446,19 +767,34 @@ run_code_review() {
 **Project**: $(basename "$PROJECT_DIR")
 **Platform**: $WORKFLOW_TYPE
 **Timestamp**: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+**Rules Source**: ${PROJECT_RULES_SOURCE:-defaults}
 
 ## Instructions
 
 Review implementation against DESIGN.md and REVIEW_CHECKLIST.md.
 
-- Check each item systematically
-- Do NOT fix issues - only report
-- Create REVIEW_RESULTS.md with findings
+### Critical Rules
+- Read REVIEW_CHECKLIST.md completely
+- Check each item systematically - do not skip
+- Verify all commits match IMPLEMENTATION.md specifications
+- Check for TODO/FIXME comments that should be resolved
+- Do NOT fix issues yourself - only report them
+- Create detailed REVIEW_RESULTS.md
+$platform_review
+
+### Decision
 - If APPROVED: Create REVIEW_APPROVED.md
-- If ISSUES: Create REVIEW_ISSUES.md
+- If ISSUES FOUND: Create REVIEW_ISSUES.md with specific problems
+
+Maximum 2 review cycles before human escalation.
+
+BEGIN NOW: Start review using REVIEW_CHECKLIST.md.
 EOF
 
     log_success "Created REVIEW_START.md"
+
+    # Build the agent prompt with project rules
+    local agent_prompt=$(build_agent_prompt "code review" "code-review" "REVIEW_START.md")
 
     local kilocode_args="--mode review"
     [ "$AUTO_APPROVE" = "true" ] && kilocode_args="$kilocode_args --auto --yolo"
@@ -467,11 +803,11 @@ EOF
 
     if [ "$VERBOSE" -eq 1 ]; then
         kilocode $kilocode_args \
-            --append-system-prompt "You are a code review agent. Read REVIEW_START.md and follow instructions." \
+            --append-system-prompt "$agent_prompt" \
             "Begin code review"
     else
         kilocode $kilocode_args \
-            --append-system-prompt "You are a code review agent. Read REVIEW_START.md and follow instructions." \
+            --append-system-prompt "$agent_prompt" \
             "Begin code review" &
 
         local pid=$!
@@ -510,6 +846,30 @@ show_status() {
     echo "Project: $PROJECT_DIR"
     echo "Platform: $(detect_workflow_type)"
     echo "Remote: ${REMOTE_EXEC:-none}"
+    echo ""
+
+    # Show rules detection
+    echo "Rules Detection:"
+    if [ -f "$PROJECT_DIR/.kilorules" ]; then
+        echo "  [✓] .kilorules (Kilocode rules)"
+    else
+        echo "  [ ] .kilorules"
+    fi
+    if [ -f "$PROJECT_DIR/.cursorrules" ]; then
+        echo "  [✓] .cursorrules (Claude rules)"
+    else
+        echo "  [ ] .cursorrules"
+    fi
+    if [ -d "$PROJECT_DIR/.claude" ]; then
+        echo "  [✓] .claude/ directory"
+    else
+        echo "  [ ] .claude/"
+    fi
+    if [ -d "$PROJECT_DIR/.kilo" ]; then
+        echo "  [✓] .kilo/ directory"
+    else
+        echo "  [ ] .kilo/"
+    fi
     echo ""
 
     echo "Phase 1: Design Review"
@@ -568,8 +928,8 @@ clean_signals() {
 
 main() {
     echo "========================================"
-    echo "  Agentic Workflow Runner v4.0"
-    echo "  Multi-Platform | Multi-Machine"
+    echo "  Agentic Workflow Runner v4.1"
+    echo "  Multi-Platform | Project Rules"
     echo "========================================"
     echo ""
 
@@ -624,7 +984,7 @@ main() {
 
 show_help() {
     cat << EOF
-Agentic Workflow Runner v4.0
+Agentic Workflow Runner v4.1
 
 Usage: $(basename "$0") [OPTIONS] [PHASE]
 
@@ -643,11 +1003,31 @@ Phases:
   -s, --status            Show current status
   --clean                 Clean all signal files
 
+Project Rules Integration:
+  The script automatically detects and loads rules from your project directory.
+  Rules are injected into agent prompts for consistent behavior.
+
+  Priority order:
+    1. .kilorules          - Kilocode-specific rules (recommended)
+    2. .cursorrules        - Claude/general rules
+    3. .claude/            - Modular Claude rules directory
+    4. .kilo/              - Modular Kilocode rules directory
+    5. profiles/           - Fallback to agentic_coding profile JSONs
+
+  For NinjaTrader projects, place .kilorules in nt8_custom/ or project folder.
+  For React projects, create .kilorules or .cursorrules with project rules.
+
 Examples:
   $(basename "$0")                           # Full workflow, auto-detect
   $(basename "$0") -t ninjatrader            # Force NinjaTrader platform
   $(basename "$0") -p /path/to/project -v    # Verbose mode
   $(basename "$0") --remote windows-nt8      # With remote execution
+  $(basename "$0") -s                        # Show status including rules detection
+
+Models (configurable in config.sh):
+  Design Review:  \${MODEL_DESIGN_REVIEW:-moonshotai/kimi-k2.5}
+  Implementation: \${MODEL_IMPLEMENTATION:-minimax/minimax-m2.1}
+  Code Review:    \${MODEL_CODE_REVIEW:-moonshotai/kimi-k2.5}
 EOF
 }
 
