@@ -27,6 +27,9 @@ A multi-platform, multi-machine orchestration system for autonomous software dev
 
 # Run with remote execution (Windows machine for NT8)
 ./scripts/run-agentic-workflow.sh --project-dir /path/to/project --remote windows-nt8
+
+# Run bug fix mode (after implementation, when issues are found)
+./scripts/run-agentic-workflow.sh --project-dir /path/to/project --bug-fix
 ```
 
 ## Supported Platforms
@@ -81,6 +84,50 @@ Autonomous code generation following implementation plan.
 ### Phase 4: Code Review (Kilocode - Kimi K2.5)
 Validation of implementation against specifications.
 
+### Phase 5: Bug Fix & Revision (Kilocode - Minimax M2.1)
+Post-implementation bug fixes and revisions based on user-provided ISSUES.md.
+- **Trigger**: Create `ISSUES.md` in project folder
+- **Priority**: ISSUES.md takes highest priority over original design
+- **Context**: Agent has access to original design for reference
+- **Use Case**: Fix bugs, correct misinterpretations, implement improvements
+
+## Bug Fix Mode
+
+When implementation reveals issues or you want to make changes:
+
+1. **Create ISSUES.md** in your project folder
+   ```bash
+   # Copy template
+   cp templates/common/ISSUES_TEMPLATE.md /path/to/project/ISSUES.md
+   
+   # Edit with your issues
+   vim /path/to/project/ISSUES.md
+   ```
+
+2. **Run bug fix mode**
+   ```bash
+   ./scripts/run-agentic-workflow.sh --project-dir /path/to/project --bug-fix
+   ```
+
+3. **Agent will**:
+   - Read ISSUES.md as primary directive
+   - Reference original design for context
+   - Fix issues systematically
+   - Commit each fix with descriptive messages
+   - Create BUGFIX_COMPLETE.md when done
+
+**ISSUES.md Format**:
+- Critical Bugs: Actual vs Expected behavior
+- Design Misinterpretations: Original requirement vs what was implemented
+- Improvements: Rationale and impact
+- Refactoring: Current vs desired state
+
+**Priority Hierarchy**:
+1. ISSUES.md (User's explicit changes)
+2. Original Design Documents (Context only)
+3. Project Rules (.kilorules, .cursorrules)
+4. Platform Templates
+
 ## Remote Execution
 
 For platforms requiring specific machines (NinjaTrader on Windows):
@@ -120,3 +167,27 @@ SYNC_REPO="git@github.com:cliff/nt8_custom.git"
 # MCP server paths
 MCP_SUPABASE_PATH="~/.config/mcp/supabase"
 ```
+
+## Obsidian Documentation
+
+This system is documented in Obsidian for easy reference and updates:
+
+- **Main Documentation**: `Agentic Coding System` note in Obsidian vault
+- **Bug Fix Mode**: `Agentic Coding/Bug Fix Mode` note
+- **Workflow Phases**: `Agentic Coding/Workflow Phases` note
+- **Platform Guides**: `Agentic Coding/Platforms/` folder
+
+When updating this README, also update the corresponding Obsidian notes to maintain consistency.
+
+To find and update Obsidian notes:
+```bash
+# List notes in Agentic Coding folder
+npx obsidian-mcp-server obsidian_list_notes --dirPath "Agentic Coding"
+
+# Read a specific note
+npx obsidian-mcp-server obsidian_read_note --filePath "Agentic Coding/Bug Fix Mode.md"
+
+# Update a note
+npx obsidian-mcp-server obsidian_update_note --filePath "Agentic Coding/Bug Fix Mode.md" --content "..."
+```
+

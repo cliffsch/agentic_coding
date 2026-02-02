@@ -1,5 +1,5 @@
 #!/bin/bash
-# Agentic Workflow Runner v4.1
+# Agentic Workflow Runner v4.2
 # Multi-Platform, Multi-Machine Orchestration
 #
 # Features:
@@ -9,6 +9,7 @@
 # - Compilation feedback loop
 # - MCP integration
 # - Git-based synchronization
+# - Bug fix & revision mode (Phase 5)
 
 set -e
 
@@ -838,6 +839,117 @@ EOF
     fi
 }
 
+run_bug_fix_mode() {
+    log_phase "=== Phase 5: Bug Fix & Revision ==="
+    log_info "Model: ${MODEL_IMPLEMENTATION:-minimax/minimax-m2.1}"
+    log_info "Platform: $WORKFLOW_TYPE"
+
+    # Check for ISSUES.md
+    if [ ! -f "$PROJECT_DIR/ISSUES.md" ]; then
+        log_error "ISSUES.md not found. Create this file with your list of issues."
+        return 1
+    fi
+
+    # Load project rules for implementation phase
+    load_project_rules "$PROJECT_DIR" "implementation"
+    [ -n "$PROJECT_RULES_SOURCE" ] && log_info "Rules: $PROJECT_RULES_SOURCE"
+
+    # Discover original design documents for context
+    local design_docs=$(discover_documents)
+
+    # Create bug fix start signal
+    cat > "$PROJECT_DIR/BUGFIX_START.md" << EOF
+# Bug Fix & Revision Start Signal
+
+**Project**: $(basename "$PROJECT_DIR")
+**Platform**: $WORKFLOW_TYPE
+**Timestamp**: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+**Rules Source**: ${PROJECT_RULES_SOURCE:-defaults}
+
+## Context Documents (Reference Only)
+$(for doc in $design_docs; do echo "- $doc"; done)
+
+## Priority Rules
+1. **ISSUES.md takes HIGHEST priority** - User's explicit changes override original design
+2. Use original design documents only for context and understanding
+3. If ISSUES.md contradicts DESIGN.md, follow ISSUES.md
+4. Maintain consistency with existing codebase patterns
+5. Do NOT revert changes that were intentionally made per ISSUES.md
+
+## Instructions
+1. Read ISSUES.md completely - this is your primary directive
+2. Read original design documents for context only
+3. Fix each issue systematically
+4. After each fix, verify it doesn't break other functionality
+5. Commit each fix with message: "Fix: [issue description]"
+6. Update BUGFIX_PROGRESS.md after each fix
+7. When all issues resolved, create BUGFIX_COMPLETE.md
+
+## Critical Rules
+- User's ISSUES.md overrides any conflicting requirements in original design
+- If an issue requires design clarification, create BUGFIX_BLOCKED.md
+- Do NOT ask clarifying questions - all requirements are in ISSUES.md
+- If blocked after 3 attempts: Create BUGFIX_BLOCKED.md and stop
+
+BEGIN NOW: Read ISSUES.md and start fixing issues.
+EOF
+
+    log_success "Created BUGFIX_START.md"
+
+    # Build the agent prompt with project rules
+    local agent_prompt=$(build_agent_prompt "bug fix" "implementation" "BUGFIX_START.md")
+
+    # Run Kilocode in code mode
+    local kilocode_args="--mode code"
+    [ "$AUTO_APPROVE" = "true" ] && kilocode_args="$kilocode_args --auto --yolo"
+
+    cd "$PROJECT_DIR"
+
+    if [ "$VERBOSE" -eq 1 ]; then
+        kilocode $kilocode_args \
+            --append-system-prompt "$agent_prompt" \
+            "Begin bug fixes"
+    else
+        kilocode $kilocode_args \
+            --append-system-prompt "$agent_prompt" \
+            "Begin bug fixes" &
+
+        local pid=$!
+        log_info "Kilocode PID: $pid"
+
+        while kill -0 $pid 2>/dev/null; do
+            # Check for compilation feedback
+            if [ "$WORKFLOW_TYPE" = "ninjatrader" ]; then
+                if [ -f "$PROJECT_DIR/feedback/COMPILE_ERRORS.md" ]; then
+                    log_warn "Compile errors detected - agent should fix"
+                fi
+            fi
+
+            if check_signal "BUGFIX_COMPLETE.md"; then
+                log_success "Bug fixes complete!"
+                return 0
+            fi
+            if check_signal "BUGFIX_BLOCKED.md"; then
+                log_error "Bug fix blocked"
+                cat "$PROJECT_DIR/BUGFIX_BLOCKED.md"
+                return 1
+            fi
+            sleep 10
+        done
+    fi
+
+    if check_signal "BUGFIX_COMPLETE.md"; then
+        log_success "Bug fixes complete!"
+        return 0
+    elif check_signal "BUGFIX_BLOCKED.md"; then
+        log_error "Bug fix blocked"
+        return 1
+    else
+        log_error "No result signal found"
+        return 1
+    fi
+}
+
 show_status() {
     echo "========================================"
     echo "  Agentic Workflow Status"
@@ -890,6 +1002,17 @@ show_status() {
     done
 
     echo ""
+    echo "Phase 5: Bug Fix & Revision"
+    if [ -f "$PROJECT_DIR/ISSUES.md" ]; then
+        echo "  [✓] ISSUES.md"
+        for f in BUGFIX_START.md BUGFIX_PROGRESS.md BUGFIX_COMPLETE.md BUGFIX_BLOCKED.md; do
+            check_signal "$f" && echo "  [✓] $f" || echo "  [ ] $f"
+        done
+    else
+        echo "  [ ] ISSUES.md (not present)"
+    fi
+
+    echo ""
     echo "Feedback:"
     for f in COMPILE_SUCCESS.md COMPILE_ERRORS.md MANUAL_VERIFIED.md; do
         if [ -f "$PROJECT_DIR/feedback/$f" ] || [ -f "$FEEDBACK_DIR/$f" ]; then
@@ -907,6 +1030,7 @@ clean_signals() {
         DESIGN_REVIEW_START.md DESIGN_REVIEW_RESULTS.md DESIGN_APPROVED.md DESIGN_ISSUES.md
         IMPLEMENTATION_START.md PROGRESS.md IMPLEMENTATION_COMPLETE.md BLOCKED.md
         REVIEW_START.md REVIEW_RESULTS.md REVIEW_APPROVED.md REVIEW_ISSUES.md
+        BUGFIX_START.md BUGFIX_PROGRESS.md BUGFIX_COMPLETE.md BUGFIX_BLOCKED.md
     )
 
     for f in "${signals[@]}"; do
@@ -928,8 +1052,8 @@ clean_signals() {
 
 main() {
     echo "========================================"
-    echo "  Agentic Workflow Runner v4.1"
-    echo "  Multi-Platform | Project Rules"
+    echo "  Agentic Workflow Runner v4.2"
+    echo "  Multi-Platform | Project Rules | Bug Fix Mode"
     echo "========================================"
     echo ""
 
@@ -939,9 +1063,21 @@ main() {
     fi
     log_workflow "Platform: $WORKFLOW_TYPE"
 
+    # Check for bug fix mode trigger
+    if [ -f "$PROJECT_DIR/ISSUES.md" ]; then
+        log_warn "ISSUES.md detected - entering bug fix mode"
+        run_bug_fix_mode
+        exit $?
+    fi
+
     # Check current state and resume appropriately
     if check_signal "REVIEW_APPROVED.md"; then
         log_success "Project already approved!"
+        exit 0
+    fi
+
+    if check_signal "BUGFIX_COMPLETE.md"; then
+        log_success "Bug fixes complete!"
         exit 0
     fi
 
@@ -984,7 +1120,7 @@ main() {
 
 show_help() {
     cat << EOF
-Agentic Workflow Runner v4.1
+Agentic Workflow Runner v4.2
 
 Usage: $(basename "$0") [OPTIONS] [PHASE]
 
@@ -1000,6 +1136,7 @@ Phases:
   -d, --design-review     Run only design review
   -i, --implementation    Run only implementation
   -c, --code-review       Run only code review
+  -b, --bug-fix          Run bug fix & revision mode (requires ISSUES.md)
   -s, --status            Show current status
   --clean                 Clean all signal files
 
@@ -1017,17 +1154,26 @@ Project Rules Integration:
   For NinjaTrader projects, place .kilorules in nt8_custom/ or project folder.
   For React projects, create .kilorules or .cursorrules with project rules.
 
+Bug Fix Mode:
+  Create ISSUES.md in your project folder with a list of bugs, misinterpretations,
+  or improvements. The agent will fix these issues while maintaining context from
+  the original design documents. ISSUES.md takes priority over original design.
+
+  See templates/common/ISSUES_TEMPLATE.md for the ISSUES.md format.
+
 Examples:
   $(basename "$0")                           # Full workflow, auto-detect
   $(basename "$0") -t ninjatrader            # Force NinjaTrader platform
   $(basename "$0") -p /path/to/project -v    # Verbose mode
   $(basename "$0") --remote windows-nt8      # With remote execution
   $(basename "$0") -s                        # Show status including rules detection
+  $(basename "$0") -b                        # Run bug fix mode (requires ISSUES.md)
 
 Models (configurable in config.sh):
   Design Review:  \${MODEL_DESIGN_REVIEW:-moonshotai/kimi-k2.5}
   Implementation: \${MODEL_IMPLEMENTATION:-minimax/minimax-m2.1}
   Code Review:    \${MODEL_CODE_REVIEW:-moonshotai/kimi-k2.5}
+  Bug Fix:        \${MODEL_IMPLEMENTATION:-minimax/minimax-m2.1}
 EOF
 }
 
@@ -1041,6 +1187,7 @@ while [[ $# -gt 0 ]]; do
         -d|--design-review) PHASE="design-review"; shift ;;
         -i|--implementation) PHASE="implementation"; shift ;;
         -c|--code-review)  PHASE="code-review"; shift ;;
+        -b|--bug-fix)      PHASE="bug-fix"; shift ;;
         -s|--status)       PHASE="status"; shift ;;
         --clean)           PHASE="clean"; shift ;;
         -h|--help)         show_help; exit 0 ;;
@@ -1056,6 +1203,7 @@ case "${PHASE:-main}" in
     design-review)   run_design_review ;;
     implementation)  run_implementation ;;
     code-review)     run_code_review ;;
+    bug-fix)         run_bug_fix_mode ;;
     status)          show_status ;;
     clean)           clean_signals ;;
     main)            main ;;
