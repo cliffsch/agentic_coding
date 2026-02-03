@@ -234,6 +234,105 @@ protected override void OnStateChange()
 
 ---
 
+## NinjaTrader Strategy Development (NT-STR)
+
+| ID | Requirement | Implementation Pattern | Default |
+|----|-------------|------------------------|---------|
+| NT-STR-1 | Use BaseStrategyTemplate | Inherit from BaseStrategyTemplate for all strategies | Required |
+| NT-STR-2 | No duplicate logging | Use base class `Log()` method; do not create custom logging methods | Required |
+| NT-STR-3 | Use base class entry methods | Call `EnterLongMarket()`/`EnterShortMarket()` instead of NinjaTrader's direct methods | Required |
+
+### NT-STR Implementation Patterns
+
+**NT-STR-1 BaseStrategyTemplate Inheritance:**
+```csharp
+public class MyStrategy : BaseStrategyTemplate
+{
+    protected override void EvaluateLongCondition()
+    {
+        // 1. Check position state
+        if (Position.MarketPosition != MarketPosition.Flat) return;
+
+        // 2. Validate entry conditions
+        if (!IsEntryValidLong()) return;
+
+        // 3. Calculate stop loss
+        double stopLoss = CalculateStopLoss(true);
+
+        // 4. Check blocking conditions
+        string blockReason = CheckDoNotEnter(stopLoss);
+        if (!string.IsNullOrEmpty(blockReason))
+        {
+            Log($"BLOCKED LONG: {blockReason}", LogLevel.Trade);
+            return;
+        }
+
+        // 5. Execute entry using base class method
+        string signalName = $"MySignal_Long_{CurrentBar}";
+        EnterLongMarket(stopLoss, signalName);
+
+        // 6. Log successful entry
+        Log($"ENTRY LONG, SL: {stopLoss:F2}", LogLevel.Trade);
+    }
+
+    protected override void EvaluateShortCondition()
+    {
+        // Similar pattern for short entries
+    }
+}
+```
+
+**NT-STR-2 Logging Pattern (CORRECT):**
+```csharp
+// CORRECT: Use base class Log() method
+Log($"ENTRY LONG at pivot {pivotName}, SL: {stopLoss:F2}", LogLevel.Trade);
+Log($"BLOCKED SHORT: {reason}", LogLevel.Trade);
+
+// INCORRECT: Do NOT create custom logging methods
+// #region Logging
+// private void LogEntry(...) { ... }
+// private void LogBlockedTrade(...) { ... }
+// #endregion
+```
+
+**NT-STR-3 Entry Methods (CORRECT):**
+```csharp
+// CORRECT: Use base class methods (handles risk, sizing, targets)
+EnterLongMarket(stopLoss, signalName);
+EnterShortMarket(stopLoss, signalName);
+
+// INCORRECT: Do NOT use NinjaTrader's direct methods
+// EnterLong(quantity, signalName);
+// EnterShort(quantity, signalName);
+```
+
+### BaseStrategyTemplate Framework Overview
+
+The `BaseStrategyTemplate` provides:
+
+- **Order Management**: Risk-based position sizing, stop loss, profit targets
+- **Time Filtering**: Configurable trading windows
+- **Logging**: Standardized `Log(message, level)` method
+- **Directional Control**: `TradeLongEnabled` and `TradeShortEnabled` properties
+
+**Available Log Levels:**
+- `LogLevel.None` (0) - No logging
+- `LogLevel.Trade` (1) - Trade entries, exits, blocked trades
+- `LogLevel.DirectionBias` (2) - HTF bias changes
+- `LogLevel.OrderManagement` (3) - Order state changes, cancellations
+- `LogLevel.Debug` (4) - Detailed diagnostic information
+
+**Methods to Override:**
+- `EvaluateLongCondition()` - Called when long entry is possible
+- `EvaluateShortCondition()` - Called when short entry is possible
+
+**Key Methods to Call:**
+- `Log(message, level)` - Standardized logging
+- `EnterLongMarket(stopLoss, signalName)` - Long entry with risk management
+- `EnterShortMarket(stopLoss, signalName)` - Short entry with risk management
+
+---
+
 ## Compliance Checklist for Design Review
 
 - [ ] Calculate mode is appropriate (OnBarClose unless OnEachTick needed)
@@ -244,3 +343,7 @@ protected override void OnStateChange()
 - [ ] Alert deduplication prevents spam
 - [ ] No hardcoded credentials
 - [ ] Logging uses Print() with timestamps
+- [ ] Strategy inherits from BaseStrategyTemplate
+- [ ] No duplicate logging methods created
+- [ ] Uses base class Log() method for all logging
+- [ ] Uses base class EnterLongMarket/EnterShortMarket for entries

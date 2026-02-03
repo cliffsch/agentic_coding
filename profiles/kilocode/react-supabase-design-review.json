@@ -1,9 +1,9 @@
 {
   "name": "react-supabase-design-review",
-  "description": "Design review agent for React/Vite/Supabase applications using Kimi K2.5",
+  "description": "Design review agent for React/Vite/Supabase applications using GLM-4.7",
   "model": {
     "provider": "kilo_gateway",
-    "model_id": "moonshotai/kimi-k2.5",
+    "model_id": "z-ai/glm-4.7",
     "temperature": 0.2,
     "max_tokens": 8192
   },

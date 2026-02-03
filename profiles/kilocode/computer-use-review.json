@@ -1,9 +1,9 @@
 {
   "name": "computer-use-review",
-  "description": "Review agent for computer-use-v3 using Kimi K2.5 for analysis and review tasks",
+  "description": "Review agent for computer-use-v3 using GLM-4.7 for analysis and review tasks",
   "model": {
     "provider": "kilo_gateway",
-    "model_id": "moonshotai/kimi-k2.5",
+    "model_id": "z-ai/glm-4.7",
     "temperature": 0.0,
     "max_tokens": 4096
   },

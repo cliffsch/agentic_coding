@@ -8,7 +8,7 @@
 | ID | Requirement | Rationale | Default |
 |----|-------------|-----------|---------|
 | OPS-1 | Project-level documentation | Self-contained projects that can be understood without external context | Required |
-| OPS-2 | Multi-level logging (INFO/WARN/ERROR/CRITICAL) | Graduated visibility for different operational contexts | Required |
+| OPS-2 | Multi-level logging (DEBUG/INFO/WARN/ERROR/CRITICAL) | Graduated visibility for different operational contexts with first level being | Required |
 | OPS-3 | Debug logging as runtime toggle | Troubleshooting without redeploy; avoid performance impact in production | Required |
 | OPS-4 | Health/status endpoints or indicators | Quick operational checks; know if system is alive | Recommended |
 | OPS-5 | Structured log format (JSON preferred) | Log aggregation friendly; machine-parseable | Recommended |

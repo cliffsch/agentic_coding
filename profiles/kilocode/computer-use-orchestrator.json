@@ -1,9 +1,9 @@
 {
   "name": "computer-use-orchestrator",
-  "description": "Orchestrator for computer-use-v3 using Kimi K2.5 for coordination and oversight",
+  "description": "Orchestrator for computer-use-v3 using GLM-4.7 for coordination and oversight",
   "model": {
     "provider": "openrouter",
-    "model_id": "moonshotai/kimi-k2.5",
+    "model_id": "z-ai/glm-4.7",
     "temperature": 0.2,
     "max_tokens": 8192
   },

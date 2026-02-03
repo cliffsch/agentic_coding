@@ -468,7 +468,7 @@ discover_documents() {
 
 run_design_review() {
     log_phase "=== Phase 1: Design Review ==="
-    log_info "Model: ${MODEL_DESIGN_REVIEW:-moonshotai/kimi-k2.5}"
+    log_info "Model: ${MODEL_DESIGN_REVIEW:-z-ai/glm-4.7}"
     log_info "Platform: $WORKFLOW_TYPE"
 
     local documents=$(discover_documents)
@@ -714,7 +714,7 @@ EOF
 
 run_code_review() {
     log_phase "=== Phase 3: Code Review ==="
-    log_info "Model: ${MODEL_CODE_REVIEW:-moonshotai/kimi-k2.5}"
+    log_info "Model: ${MODEL_CODE_REVIEW:-z-ai/glm-4.7}"
     log_info "Platform: $WORKFLOW_TYPE"
 
     if ! check_signal "IMPLEMENTATION_COMPLETE.md"; then
@@ -1170,9 +1170,9 @@ Examples:
   $(basename "$0") -b                        # Run bug fix mode (requires ISSUES.md)
 
 Models (configurable in config.sh):
-  Design Review:  \${MODEL_DESIGN_REVIEW:-moonshotai/kimi-k2.5}
+  Design Review:  \${MODEL_DESIGN_REVIEW:-z-ai/glm-4.7}
   Implementation: \${MODEL_IMPLEMENTATION:-minimax/minimax-m2.1}
-  Code Review:    \${MODEL_CODE_REVIEW:-moonshotai/kimi-k2.5}
+  Code Review:    \${MODEL_CODE_REVIEW:-z-ai/glm-4.7}
   Bug Fix:        \${MODEL_IMPLEMENTATION:-minimax/minimax-m2.1}
 EOF
 }

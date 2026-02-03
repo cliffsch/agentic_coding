@@ -1,9 +1,9 @@
 {
   "name": "csharp-ninjatrader-review",
-  "description": "Code review agent for C#/NinjaTrader indicators and strategies using Kimi K2.5",
+  "description": "Code review agent for C#/NinjaTrader indicators and strategies using GLM-4.7",
   "model": {
     "provider": "kilo_gateway",
-    "model_id": "moonshotai/kimi-k2.5",
+    "model_id": "z-ai/glm-4.7",
     "temperature": 0.0,
     "max_tokens": 4096
   },
