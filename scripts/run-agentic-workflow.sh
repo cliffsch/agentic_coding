@@ -463,6 +463,59 @@ discover_documents() {
 }
 
 # =============================================================================
+# DEV SERVER MANAGEMENT (React Projects)
+# =============================================================================
+
+DEV_SERVER_PID=""
+WATCHER_PID=""
+DEV_PORT="${DEV_PORT:-5173}"
+
+start_dev_server_background() {
+    if [ "$WORKFLOW_TYPE" != "react-supabase" ] && [ "$WORKFLOW_TYPE" != "react-vite" ]; then
+        return 0
+    fi
+
+    log_info "Starting local dev server..."
+    "${SCRIPT_DIR}/start-dev-server.sh" "$PROJECT_DIR" start
+
+    # Start the watcher in background
+    log_info "Starting compilation watcher..."
+    "${SCRIPT_DIR}/watch-dev-server.sh" "$PROJECT_DIR" &
+    WATCHER_PID=$!
+
+    log_success "Dev environment ready (port: $DEV_PORT)"
+}
+
+stop_dev_server_background() {
+    if [ "$WORKFLOW_TYPE" != "react-supabase" ] && [ "$WORKFLOW_TYPE" != "react-vite" ]; then
+        return 0
+    fi
+
+    log_info "Stopping dev server and watcher..."
+
+    # Stop watcher
+    if [ -n "$WATCHER_PID" ]; then
+        kill "$WATCHER_PID" 2>/dev/null || true
+    fi
+    if [ -f "$PROJECT_DIR/.watcher.pid" ]; then
+        kill "$(cat "$PROJECT_DIR/.watcher.pid")" 2>/dev/null || true
+        rm -f "$PROJECT_DIR/.watcher.pid"
+    fi
+
+    # Stop dev server
+    "${SCRIPT_DIR}/start-dev-server.sh" "$PROJECT_DIR" stop
+
+    log_success "Dev environment stopped"
+}
+
+# Cleanup on exit
+cleanup_dev_environment() {
+    stop_dev_server_background
+}
+
+trap cleanup_dev_environment EXIT INT TERM
+
+# =============================================================================
 # WORKFLOW PHASES
 # =============================================================================
 
@@ -661,6 +714,12 @@ EOF
     # Build the agent prompt with project rules
     local agent_prompt=$(build_agent_prompt "implementation" "implementation" "IMPLEMENTATION_START.md")
 
+    # For React projects, start dev server in background
+    if [ "$WORKFLOW_TYPE" = "react-supabase" ] || [ "$WORKFLOW_TYPE" = "react-vite" ]; then
+        start_dev_server_background
+        log_info "Dev server running - compilation feedback enabled"
+    fi
+
     # Run Kilocode
     local kilocode_args="--mode code"
     [ "$AUTO_APPROVE" = "true" ] && kilocode_args="$kilocode_args --auto --yolo"
@@ -680,11 +739,9 @@ EOF
         log_info "Kilocode PID: $pid"
 
         while kill -0 $pid 2>/dev/null; do
-            # For NinjaTrader, check for compilation feedback
-            if [ "$WORKFLOW_TYPE" = "ninjatrader" ]; then
-                if [ -f "$PROJECT_DIR/feedback/COMPILE_ERRORS.md" ]; then
-                    log_warn "Compile errors detected - agent should fix"
-                fi
+            # Check for compilation feedback (NinjaTrader or React)
+            if [ -f "$PROJECT_DIR/feedback/COMPILE_ERRORS.md" ]; then
+                log_warn "Compile errors detected - agent should fix"
             fi
 
             if check_signal "IMPLEMENTATION_COMPLETE.md"; then
@@ -709,6 +766,174 @@ EOF
     else
         log_error "No result signal found"
         return 1
+    fi
+}
+
+run_browser_testing() {
+    log_phase "=== Phase 2.5: Browser Testing ===="
+    log_info "Model: ${MODEL_IMPLEMENTATION:-minimax/minimax-m2.1}"
+    log_info "Platform: $WORKFLOW_TYPE"
+    log_info "Dev Server: http://localhost:${DEV_PORT}"
+
+    # Only for React projects
+    if [ "$WORKFLOW_TYPE" != "react-supabase" ] && [ "$WORKFLOW_TYPE" != "react-vite" ]; then
+        log_info "Browser testing not applicable for $WORKFLOW_TYPE, skipping"
+        return 0
+    fi
+
+    if ! check_signal "IMPLEMENTATION_COMPLETE.md"; then
+        log_error "IMPLEMENTATION_COMPLETE.md not found"
+        return 1
+    fi
+
+    # Ensure dev server is running
+    start_dev_server_background
+
+    # Load project rules for implementation phase
+    load_project_rules "$PROJECT_DIR" "implementation"
+    [ -n "$PROJECT_RULES_SOURCE" ] && log_info "Rules: $PROJECT_RULES_SOURCE"
+
+    # Copy browser test checklist if not exists
+    if [ ! -f "$PROJECT_DIR/BROWSER_TEST_CHECKLIST.md" ]; then
+        local template="${TEMPLATES_DIR}/platform/${WORKFLOW_TYPE}/BROWSER_TEST_CHECKLIST.md"
+        if [ -f "$template" ]; then
+            cp "$template" "$PROJECT_DIR/BROWSER_TEST_CHECKLIST.md"
+            # Replace placeholders
+            sed -i.bak "s/{PROJECT_NAME}/$(basename "$PROJECT_DIR")/g" "$PROJECT_DIR/BROWSER_TEST_CHECKLIST.md"
+            sed -i.bak "s/{PORT}/${DEV_PORT}/g" "$PROJECT_DIR/BROWSER_TEST_CHECKLIST.md"
+            rm -f "$PROJECT_DIR/BROWSER_TEST_CHECKLIST.md.bak"
+            log_info "Created BROWSER_TEST_CHECKLIST.md"
+        fi
+    fi
+
+    # Create browser test start signal
+    cat > "$PROJECT_DIR/BROWSER_TEST_START.md" << EOF
+# Browser Testing Start Signal
+
+**Project**: $(basename "$PROJECT_DIR")
+**Platform**: $WORKFLOW_TYPE
+**Dev Server**: http://localhost:${DEV_PORT}
+**Timestamp**: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+**Rules Source**: ${PROJECT_RULES_SOURCE:-defaults}
+
+## Critical: Use browser-action Tool
+
+You have access to the \`browser-action\` tool (Puppeteer/Chromium integration).
+This is your PRIMARY testing tool - use it extensively.
+
+## Instructions
+
+1. **Read** BROWSER_TEST_CHECKLIST.md completely
+2. **Use browser-action** to open http://localhost:${DEV_PORT}
+3. **Test systematically** following the checklist
+4. **Capture evidence**:
+   - Take screenshots (save to screenshots/ directory)
+   - Capture console errors
+   - Document network failures
+5. **Document findings** in BROWSER_TEST_RESULTS.md
+6. **Fix issues** found during testing
+7. **Re-test** after fixes until all tests pass
+8. **Signal completion** by creating BROWSER_TEST_PASS.md
+
+## Testing Strategy
+
+### Phase 1: Compilation Check
+- Verify no compilation errors (check feedback/COMPILE_ERRORS.md)
+- Wait for feedback/COMPILE_SUCCESS.md if needed
+
+### Phase 2: Browser Smoke Test
+- Open the app in browser-action
+- Verify page loads without console errors
+- Check for 404s, network errors
+- Screenshot the initial state
+
+### Phase 3: Functionality Testing
+- Test core user flows per checklist
+- Verify Supabase integration works
+- Test authentication if applicable
+- Verify data loads correctly
+
+### Phase 4: Error Handling
+- Intentionally trigger error scenarios
+- Verify error messages display
+- Check error boundaries work
+- Confirm graceful degradation
+
+## Critical Rules
+
+- Do NOT skip browser testing - this is essential
+- Use browser-action for ALL browser interactions
+- Take screenshots of EVERY significant state and ALL issues
+- Maximum 3 test-fix-retest iterations
+- If blocked after 3 attempts: Create BROWSER_TEST_BLOCKED.md
+
+## Success Criteria
+
+Create BROWSER_TEST_PASS.md when:
+- ✅ No console errors (or only acceptable warnings documented)
+- ✅ All core functionality works per checklist
+- ✅ No visual/layout bugs
+- ✅ Supabase integration working
+- ✅ Screenshots show correct rendering
+
+BEGIN NOW: Use browser-action to open http://localhost:${DEV_PORT} and start testing.
+EOF
+
+    log_success "Created BROWSER_TEST_START.md"
+
+    # Build the agent prompt with project rules
+    local agent_prompt=$(build_agent_prompt "browser testing" "implementation" "BROWSER_TEST_START.md")
+
+    # Run Kilocode with browser testing
+    local kilocode_args="--mode code"
+    [ "$AUTO_APPROVE" = "true" ] && kilocode_args="$kilocode_args --auto --yolo"
+
+    cd "$PROJECT_DIR"
+
+    log_info "Starting Kilocode browser testing..."
+    log_info "Kilocode will use browser-action tool to test the app"
+
+    if [ "$VERBOSE" -eq 1 ]; then
+        kilocode $kilocode_args \
+            --append-system-prompt "$agent_prompt" \
+            "Use browser-action to test the application at http://localhost:${DEV_PORT}"
+    else
+        kilocode $kilocode_args \
+            --append-system-prompt "$agent_prompt" \
+            "Use browser-action to test the application at http://localhost:${DEV_PORT}" &
+
+        local pid=$!
+        log_info "Kilocode PID: $pid"
+
+        while kill -0 $pid 2>/dev/null; do
+            # Check for compilation errors during testing
+            if [ -f "$PROJECT_DIR/feedback/COMPILE_ERRORS.md" ]; then
+                log_warn "Compile errors detected - agent should fix and re-test"
+            fi
+
+            if check_signal "BROWSER_TEST_PASS.md"; then
+                log_success "Browser tests passed!"
+                return 0
+            fi
+            if check_signal "BROWSER_TEST_BLOCKED.md"; then
+                log_error "Browser testing blocked"
+                cat "$PROJECT_DIR/BROWSER_TEST_BLOCKED.md"
+                return 1
+            fi
+            sleep 10
+        done
+    fi
+
+    # Check final status
+    if check_signal "BROWSER_TEST_PASS.md"; then
+        log_success "Browser tests passed!"
+        return 0
+    elif check_signal "BROWSER_TEST_BLOCKED.md"; then
+        log_error "Browser testing blocked"
+        return 1
+    else
+        log_warn "No browser test result signal found, proceeding..."
+        return 0
     fi
 }
 
@@ -896,6 +1121,12 @@ EOF
 
     log_success "Created BUGFIX_START.md"
 
+    # For React projects, start dev server in background
+    if [ "$WORKFLOW_TYPE" = "react-supabase" ] || [ "$WORKFLOW_TYPE" = "react-vite" ]; then
+        start_dev_server_background
+        log_info "Dev server running - compilation and browser testing enabled"
+    fi
+
     # Build the agent prompt with project rules
     local agent_prompt=$(build_agent_prompt "bug fix" "implementation" "BUGFIX_START.md")
 
@@ -919,10 +1150,8 @@ EOF
 
         while kill -0 $pid 2>/dev/null; do
             # Check for compilation feedback
-            if [ "$WORKFLOW_TYPE" = "ninjatrader" ]; then
-                if [ -f "$PROJECT_DIR/feedback/COMPILE_ERRORS.md" ]; then
-                    log_warn "Compile errors detected - agent should fix"
-                fi
+            if [ -f "$PROJECT_DIR/feedback/COMPILE_ERRORS.md" ]; then
+                log_warn "Compile errors detected - agent should fix"
             fi
 
             if check_signal "BUGFIX_COMPLETE.md"; then
@@ -996,6 +1225,27 @@ show_status() {
     done
 
     echo ""
+    echo "Phase 2.5: Browser Testing (React Projects)"
+    if [ "$WORKFLOW_TYPE" = "react-supabase" ] || [ "$WORKFLOW_TYPE" = "react-vite" ]; then
+        for f in BROWSER_TEST_START.md BROWSER_TEST_CHECKLIST.md BROWSER_TEST_RESULTS.md BROWSER_TEST_PASS.md BROWSER_TEST_BLOCKED.md; do
+            check_signal "$f" && echo "  [✓] $f" || echo "  [ ] $f"
+        done
+        # Check dev server status
+        if [ -f "$PROJECT_DIR/.dev-server.pid" ]; then
+            local pid=$(cat "$PROJECT_DIR/.dev-server.pid")
+            if ps -p "$pid" > /dev/null 2>&1; then
+                echo "  [✓] Dev server running (PID: $pid)"
+            else
+                echo "  [ ] Dev server stopped"
+            fi
+        else
+            echo "  [ ] Dev server not started"
+        fi
+    else
+        echo "  [N/A] Not applicable for $WORKFLOW_TYPE"
+    fi
+
+    echo ""
     echo "Phase 3: Code Review"
     for f in REVIEW_START.md REVIEW_RESULTS.md REVIEW_APPROVED.md REVIEW_ISSUES.md; do
         check_signal "$f" && echo "  [✓] $f" || echo "  [ ] $f"
@@ -1026,9 +1276,13 @@ show_status() {
 clean_signals() {
     log_warn "Cleaning all signal files..."
 
+    # Stop dev server if running
+    stop_dev_server_background
+
     local signals=(
         DESIGN_REVIEW_START.md DESIGN_REVIEW_RESULTS.md DESIGN_APPROVED.md DESIGN_ISSUES.md
         IMPLEMENTATION_START.md PROGRESS.md IMPLEMENTATION_COMPLETE.md BLOCKED.md
+        BROWSER_TEST_START.md BROWSER_TEST_RESULTS.md BROWSER_TEST_PASS.md BROWSER_TEST_BLOCKED.md
         REVIEW_START.md REVIEW_RESULTS.md REVIEW_APPROVED.md REVIEW_ISSUES.md
         BUGFIX_START.md BUGFIX_PROGRESS.md BUGFIX_COMPLETE.md BUGFIX_BLOCKED.md
     )
@@ -1042,6 +1296,11 @@ clean_signals() {
     rm -f "$PROJECT_DIR/feedback/COMPILE_ERRORS.md"
     rm -f "$FEEDBACK_DIR/COMPILE_SUCCESS.md"
     rm -f "$FEEDBACK_DIR/COMPILE_ERRORS.md"
+
+    # Clean dev server files
+    rm -f "$PROJECT_DIR/.dev-server.pid"
+    rm -f "$PROJECT_DIR/.dev-server.log"
+    rm -f "$PROJECT_DIR/.watcher.pid"
 
     log_success "Signal files cleaned"
 }
@@ -1081,8 +1340,15 @@ main() {
         exit 0
     fi
 
+    if check_signal "BROWSER_TEST_PASS.md"; then
+        log_info "Browser tests passed, running code review..."
+        run_code_review
+        exit $?
+    fi
+
     if check_signal "IMPLEMENTATION_COMPLETE.md"; then
-        log_info "Implementation complete, running code review..."
+        log_info "Implementation complete, running browser tests..."
+        run_browser_testing || exit $?
         run_code_review
         exit $?
     fi
@@ -1090,12 +1356,17 @@ main() {
     if check_signal "DESIGN_APPROVED.md"; then
         log_info "Design approved, running implementation..."
         run_implementation || exit $?
+        run_browser_testing || exit $?
         run_code_review
         exit $?
     fi
 
     # Full workflow
-    log_workflow "Starting full 3-phase workflow..."
+    if [ "$WORKFLOW_TYPE" = "react-supabase" ] || [ "$WORKFLOW_TYPE" = "react-vite" ]; then
+        log_workflow "Starting full workflow with browser testing..."
+    else
+        log_workflow "Starting full 3-phase workflow..."
+    fi
 
     run_design_review
     case $? in
@@ -1105,6 +1376,11 @@ main() {
     esac
 
     run_implementation || { log_error "Implementation failed"; exit 1; }
+
+    # Browser testing for React projects
+    if [ "$WORKFLOW_TYPE" = "react-supabase" ] || [ "$WORKFLOW_TYPE" = "react-vite" ]; then
+        run_browser_testing || { log_error "Browser testing failed"; exit 1; }
+    fi
 
     run_code_review
     case $? in
@@ -1135,6 +1411,7 @@ Options:
 Phases:
   -d, --design-review     Run only design review
   -i, --implementation    Run only implementation
+  --browser-test          Run only browser testing (React projects)
   -c, --code-review       Run only code review
   -b, --bug-fix          Run bug fix & revision mode (requires ISSUES.md)
   -s, --status            Show current status
@@ -1161,9 +1438,18 @@ Bug Fix Mode:
 
   See templates/common/ISSUES_TEMPLATE.md for the ISSUES.md format.
 
+React/Browser Testing:
+  For React projects, the script automatically:
+  - Starts local dev server (npm/pnpm/yarn run dev)
+  - Monitors compilation errors in real-time
+  - Runs browser testing using Kilocode's browser-action tool
+  - Captures console errors and screenshots
+  - Provides feedback loop for iterative fixes
+
 Examples:
   $(basename "$0")                           # Full workflow, auto-detect
-  $(basename "$0") -t ninjatrader            # Force NinjaTrader platform
+  $(basename "$0") -t react-supabase         # Force React/Supabase platform
+  $(basename "$0") --browser-test            # Run only browser testing phase
   $(basename "$0") -p /path/to/project -v    # Verbose mode
   $(basename "$0") --remote windows-nt8      # With remote execution
   $(basename "$0") -s                        # Show status including rules detection
@@ -1186,6 +1472,7 @@ while [[ $# -gt 0 ]]; do
         -v|--verbose)      VERBOSE=1; shift ;;
         -d|--design-review) PHASE="design-review"; shift ;;
         -i|--implementation) PHASE="implementation"; shift ;;
+        --browser-test)    PHASE="browser-test"; shift ;;
         -c|--code-review)  PHASE="code-review"; shift ;;
         -b|--bug-fix)      PHASE="bug-fix"; shift ;;
         -s|--status)       PHASE="status"; shift ;;
@@ -1202,6 +1489,7 @@ cd "$PROJECT_DIR"
 case "${PHASE:-main}" in
     design-review)   run_design_review ;;
     implementation)  run_implementation ;;
+    browser-test)    run_browser_testing ;;
     code-review)     run_code_review ;;
     bug-fix)         run_bug_fix_mode ;;
     status)          show_status ;;
