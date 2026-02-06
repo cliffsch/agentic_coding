@@ -97,7 +97,7 @@ export MAX_RETRIES=3
 # Verbose logging (true/false)
 export VERBOSE="false"
 
-# Auto-approve file operations in Kilocode (--yolo mode)
+# Auto-approve all permissions in Kilocode (--auto flag for pipeline usage)
 export AUTO_APPROVE="true"
 
 # Create git commits after each phase (true/false)
