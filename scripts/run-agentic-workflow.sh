@@ -616,11 +616,13 @@ EOF
     local kilocode_args="--model ${MODEL_DESIGN_REVIEW:-moonshotai/kimi-k2.5}"
     [ "$AUTO_APPROVE" = "true" ] && kilocode_args="$kilocode_args --auto"
 
-    local task_message="Read DESIGN_REVIEW_START.md and follow all instructions. You are the design review agent."
+    local task_message="Read DESIGN_REVIEW_START.md and follow all instructions. You are the design review agent. MANDATORY OUTPUT: create exactly one of DESIGN_APPROVED.md or DESIGN_ISSUES.md in the project root before exiting."
+    local kilocode_exit=0
 
     cd "$PROJECT_DIR"
     if [ "$VERBOSE" -eq 1 ]; then
         kilocode run $kilocode_args "$task_message"
+        kilocode_exit=$?
     else
         kilocode run $kilocode_args "$task_message" &
 
@@ -640,6 +642,23 @@ EOF
             fi
             sleep 5
         done
+        wait "$pid"
+        kilocode_exit=$?
+    fi
+
+    # Compatibility fallback: older flows sometimes write a consolidated result file
+    if ! check_signal "DESIGN_APPROVED.md" && ! check_signal "DESIGN_ISSUES.md" && check_signal "DESIGN_REVIEW_RESULTS.md"; then
+        if grep -Eiq "APPROVED|PASS" "$PROJECT_DIR/DESIGN_REVIEW_RESULTS.md"; then
+            cat > "$PROJECT_DIR/DESIGN_APPROVED.md" << EOF
+# Design Approved (inferred)
+
+Inferred from DESIGN_REVIEW_RESULTS.md by run-agentic-workflow.sh.
+EOF
+            log_warn "Inferred DESIGN_APPROVED.md from DESIGN_REVIEW_RESULTS.md"
+        elif grep -Eiq "ISSUES|NOT APPROVED|FAIL|REJECT" "$PROJECT_DIR/DESIGN_REVIEW_RESULTS.md"; then
+            cp "$PROJECT_DIR/DESIGN_REVIEW_RESULTS.md" "$PROJECT_DIR/DESIGN_ISSUES.md"
+            log_warn "Inferred DESIGN_ISSUES.md from DESIGN_REVIEW_RESULTS.md"
+        fi
     fi
 
     # Check final status
@@ -650,7 +669,12 @@ EOF
         log_warn "Design has issues"
         return 2
     else
+        if [ "$kilocode_exit" -ne 0 ]; then
+            log_error "Kilocode exited with code $kilocode_exit and produced no result signal"
+        fi
         log_error "No result signal found"
+        log_warn "Expected one of: DESIGN_APPROVED.md or DESIGN_ISSUES.md in $PROJECT_DIR"
+        [ -f "$PROJECT_DIR/DESIGN_REVIEW_RESULTS.md" ] && log_warn "Found DESIGN_REVIEW_RESULTS.md but could not infer status"
         return 1
     fi
 }
@@ -749,12 +773,14 @@ EOF
     local kilocode_args="--model ${MODEL_IMPLEMENTATION:-minimax/minimax-m2.1}"
     [ "$AUTO_APPROVE" = "true" ] && kilocode_args="$kilocode_args --auto"
 
-    local task_message="Read IMPLEMENTATION_START.md and follow all instructions. You are the implementation agent."
+    local task_message="Read IMPLEMENTATION_START.md and follow all instructions. You are the implementation agent. MANDATORY OUTPUT: create exactly one of IMPLEMENTATION_COMPLETE.md or BLOCKED.md in the project root before exiting."
+    local kilocode_exit=0
 
     cd "$PROJECT_DIR"
 
     if [ "$VERBOSE" -eq 1 ]; then
         kilocode run $kilocode_args "$task_message"
+        kilocode_exit=$?
     else
         kilocode run $kilocode_args "$task_message" &
 
@@ -778,6 +804,8 @@ EOF
             fi
             sleep 10
         done
+        wait "$pid"
+        kilocode_exit=$?
     fi
 
     if check_signal "IMPLEMENTATION_COMPLETE.md"; then
@@ -785,9 +813,14 @@ EOF
         return 0
     elif check_signal "BLOCKED.md"; then
         log_error "Implementation blocked"
+        cat "$PROJECT_DIR/BLOCKED.md"
         return 1
     else
+        if [ "$kilocode_exit" -ne 0 ]; then
+            log_error "Kilocode exited with code $kilocode_exit and produced no result signal"
+        fi
         log_error "No result signal found"
+        log_warn "Expected one of: IMPLEMENTATION_COMPLETE.md or BLOCKED.md in $PROJECT_DIR"
         return 1
     fi
 }
@@ -829,6 +862,12 @@ run_browser_testing() {
         fi
     fi
 
+    # Clean stale browser test signals from previous runs
+    rm -f "$PROJECT_DIR/BROWSER_TEST_PASS.md"
+    rm -f "$PROJECT_DIR/BROWSER_TEST_BLOCKED.md"
+    rm -f "$PROJECT_DIR/BROWSER_TEST_RESULTS.md"
+    rm -f "$PROJECT_DIR/BROWSER_TEST_START.md"
+
     # Create browser test start signal
     cat > "$PROJECT_DIR/BROWSER_TEST_START.md" << EOF
 # Browser Testing Start Signal
@@ -839,24 +878,60 @@ run_browser_testing() {
 **Timestamp**: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
 **Rules Source**: ${PROJECT_RULES_SOURCE:-defaults}
 
-## Critical: Use browser-action Tool
+## Critical: Use Playwright MCP Browser Tools
 
-You have access to the \`browser-action\` tool (Puppeteer/Chromium integration).
-This is your PRIMARY testing tool - use it extensively.
+You have access to the Playwright MCP browser tools (headless Chromium).
+These are your PRIMARY testing tools - use them extensively.
+
+### Available Tools (Playwright MCP - Accessibility Mode)
+| Tool | Purpose |
+|------|---------|
+| \`browser_navigate\` | Open a URL |
+| \`browser_snapshot\` | Get accessibility tree of page (structured text showing all elements, roles, names, values) |
+| \`browser_click\` | Click an element by accessibility ref or text |
+| \`browser_type\` | Type text into a focused field |
+| \`browser_fill_form\` | Fill multiple form fields at once |
+| \`browser_evaluate\` | Run JavaScript on the page (use for CSS checks, DOM queries, data extraction) |
+| \`browser_console_messages\` | Capture console errors/warnings |
+| \`browser_wait_for\` | Wait for text or element to appear |
+| \`browser_verify_text_visible\` | Assert text is visible on page |
+| \`browser_verify_element_visible\` | Assert element is visible |
+| \`browser_scroll_down\` / \`browser_scroll_up\` | Scroll the page |
+| \`browser_hover\` | Hover over an element |
+| \`browser_select_option\` | Select from dropdowns |
+| \`browser_press_key\` | Press keyboard keys |
+| \`browser_close\` | End browser session |
+
+### How Accessibility Snapshots Work
+\`browser_snapshot\` returns the page's accessibility tree as structured text, e.g.:
+\`\`\`
+- heading "Dashboard" [level=1]
+- navigation "Main Menu"
+  - link "Home"
+  - link "Settings"
+- table "User List"
+  - row: "John" | "admin" | "Active"
+\`\`\`
+Use this to verify page structure, element presence, and content — no screenshots needed.
+Use \`browser_evaluate\` to run JavaScript for anything the accessibility tree doesn't cover (CSS values, computed styles, hidden state, data attributes).
 
 ## Instructions
 
 1. **Read** BROWSER_TEST_CHECKLIST.md completely
-2. **Use browser-action** to open http://localhost:${DEV_PORT}
-3. **Test systematically** following the checklist
-4. **Capture evidence**:
-   - Take screenshots (save to screenshots/ directory)
-   - Capture console errors
-   - Document network failures
-5. **Document findings** in BROWSER_TEST_RESULTS.md
-6. **Fix issues** found during testing
-7. **Re-test** after fixes until all tests pass
-8. **Signal completion** by creating BROWSER_TEST_PASS.md
+2. **Use \`browser_navigate\`** to open http://localhost:${DEV_PORT}
+3. **Use \`browser_snapshot\`** to capture the page structure after load
+4. **Use \`browser_console_messages\`** to check for errors immediately
+5. **Test systematically** following the checklist:
+   - Use \`browser_snapshot\` after each navigation/interaction to verify page state
+   - Use \`browser_verify_text_visible\` to assert expected content
+   - Use \`browser_click\`, \`browser_type\`, \`browser_fill_form\` to interact with the UI
+   - Use \`browser_evaluate\` for checks the accessibility tree can't cover
+   - Use \`browser_console_messages\` periodically to catch runtime errors
+6. **Document findings** in BROWSER_TEST_RESULTS.md with pass/fail per checklist item
+7. **Fix issues** found during testing
+8. **Re-test** after fixes until all tests pass
+9. **Use \`browser_close\`** when done testing
+10. **Signal completion** by creating BROWSER_TEST_PASS.md
 
 ## Testing Strategy
 
@@ -865,41 +940,45 @@ This is your PRIMARY testing tool - use it extensively.
 - Wait for feedback/COMPILE_SUCCESS.md if needed
 
 ### Phase 2: Browser Smoke Test
-- Open the app in browser-action
-- Verify page loads without console errors
-- Check for 404s, network errors
-- Screenshot the initial state
+- Use \`browser_navigate\` to open http://localhost:${DEV_PORT}
+- Use \`browser_snapshot\` to verify page structure loaded (should show headings, nav, content)
+- Use \`browser_console_messages\` to check for errors
+- Use \`browser_evaluate\` with \`document.title\` and \`document.readyState\` to confirm page is ready
 
 ### Phase 3: Functionality Testing
-- Test core user flows per checklist
-- Verify Supabase integration works
-- Test authentication if applicable
-- Verify data loads correctly
+- Test core user flows per checklist using browser tools
+- Use \`browser_click\`, \`browser_type\`, \`browser_fill_form\` to interact
+- After each interaction, use \`browser_snapshot\` to verify the UI updated correctly
+- Use \`browser_verify_text_visible\` to assert expected outcomes
+- Use \`browser_evaluate\` to check Supabase data (e.g. \`document.querySelectorAll('tr').length\`)
+- Verify data loads, mutations succeed, state updates reflect in UI
 
 ### Phase 4: Error Handling
-- Intentionally trigger error scenarios
-- Verify error messages display
-- Check error boundaries work
-- Confirm graceful degradation
+- Intentionally trigger error scenarios via browser interactions
+- Use \`browser_verify_text_visible\` to verify error messages display
+- Use \`browser_console_messages\` to check error logging
+- Use \`browser_snapshot\` to verify error boundary renders fallback UI
 
 ## Critical Rules
 
-- Do NOT skip browser testing - this is essential
-- Use browser-action for ALL browser interactions
-- Take screenshots of EVERY significant state and ALL issues
+- Do NOT skip browser testing - you MUST use the Playwright browser tools
+- If you do NOT have browser tools available, create BROWSER_TEST_BLOCKED.md explaining the tooling gap - do NOT create BROWSER_TEST_PASS.md without actual testing
+- Use \`browser_snapshot\` after EVERY significant interaction to verify state
 - Maximum 3 test-fix-retest iterations
-- If blocked after 3 attempts: Create BROWSER_TEST_BLOCKED.md
+- If blocked after 3 attempts: Create BROWSER_TEST_BLOCKED.md and stop
 
-## Success Criteria
+## BROWSER_TEST_PASS.md Requirements
 
-Create BROWSER_TEST_PASS.md when:
-- ✅ No console errors (or only acceptable warnings documented)
-- ✅ All core functionality works per checklist
-- ✅ No visual/layout bugs
-- ✅ Supabase integration working
-- ✅ Screenshots show correct rendering
+You may ONLY create BROWSER_TEST_PASS.md if ALL of these are true:
+- You successfully used \`browser_navigate\` to load the app
+- You used \`browser_snapshot\` to verify the page structure
+- You used \`browser_console_messages\` and found no errors (or documented acceptable warnings)
+- All core functionality tested per checklist with \`browser_click\`/\`browser_type\`/\`browser_verify_text_visible\`
+- BROWSER_TEST_RESULTS.md exists with detailed pass/fail per item
 
-BEGIN NOW: Use browser-action to open http://localhost:${DEV_PORT} and start testing.
+If you cannot use the browser tools, create BROWSER_TEST_BLOCKED.md instead.
+
+BEGIN NOW: Use \`browser_navigate\` to open http://localhost:${DEV_PORT} and start testing.
 EOF
 
     log_success "Created BROWSER_TEST_START.md"
@@ -908,12 +987,12 @@ EOF
     local kilocode_args="--model ${MODEL_IMPLEMENTATION:-minimax/minimax-m2.1}"
     [ "$AUTO_APPROVE" = "true" ] && kilocode_args="$kilocode_args --auto"
 
-    local task_message="Read BROWSER_TEST_START.md and follow all instructions. Use browser-action to test the application at http://localhost:${DEV_PORT}."
+    local task_message="Read BROWSER_TEST_START.md and follow all instructions. Use the Playwright MCP browser tools (browser_navigate, browser_snapshot, browser_click, browser_verify_text_visible, etc.) to test the application at http://localhost:${DEV_PORT}."
 
     cd "$PROJECT_DIR"
 
     log_info "Starting Kilocode browser testing..."
-    log_info "Kilocode will use browser-action tool to test the app"
+    log_info "Kilocode will use Playwright MCP browser tools to test the app"
 
     if [ "$VERBOSE" -eq 1 ]; then
         kilocode run $kilocode_args "$task_message"
@@ -942,16 +1021,24 @@ EOF
         done
     fi
 
-    # Check final status
-    if check_signal "BROWSER_TEST_PASS.md"; then
+    # Validate browser test results
+    if check_signal "BROWSER_TEST_BLOCKED.md"; then
+        log_error "Browser testing blocked"
+        cat "$PROJECT_DIR/BROWSER_TEST_BLOCKED.md"
+        return 1
+    elif check_signal "BROWSER_TEST_PASS.md"; then
+        # Validate that actual testing occurred (prevent false positives)
+        if ! check_signal "BROWSER_TEST_RESULTS.md"; then
+            log_warn "BROWSER_TEST_PASS.md exists but no BROWSER_TEST_RESULTS.md - likely false positive"
+            log_error "Agent reported pass without actual browser testing evidence"
+            return 1
+        fi
         log_success "Browser tests passed!"
         return 0
-    elif check_signal "BROWSER_TEST_BLOCKED.md"; then
-        log_error "Browser testing blocked"
-        return 1
     else
-        log_warn "No browser test result signal found, proceeding..."
-        return 0
+        log_warn "No browser test result signal found"
+        log_error "Browser testing did not complete - agent may lack browser tools"
+        return 1
     fi
 }
 
@@ -1711,7 +1798,7 @@ React/Browser Testing:
   For React projects, the script automatically:
   - Starts local dev server (npm/pnpm/yarn run dev)
   - Monitors compilation errors in real-time
-  - Runs browser testing using Kilocode's browser-action tool
+  - Runs browser testing using Playwright MCP browser tools
   - Captures console errors and screenshots
   - Provides feedback loop for iterative fixes
 

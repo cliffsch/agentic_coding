@@ -83,9 +83,9 @@ export MCP_NT8_ENABLED="false"  # Future: computer-use MCP
 # =============================================================================
 
 # Default models for each phase (can be overridden per-platform)
-export MODEL_DESIGN_REVIEW="moonshotai/kimi-k2.5"
-export MODEL_IMPLEMENTATION="minimax/minimax-m2.1"
-export MODEL_CODE_REVIEW="moonshotai/kimi-k2.5"
+export MODEL_DESIGN_REVIEW="kilo/moonshotai/kimi-k2.5"
+export MODEL_IMPLEMENTATION="kilo/minimax/minimax-m2.1"
+export MODEL_CODE_REVIEW="kilo/moonshotai/kimi-k2.5"
 
 # =============================================================================
 # WORKFLOW OPTIONS

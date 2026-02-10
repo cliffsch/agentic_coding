@@ -314,10 +314,81 @@ When designing for cross-machine execution:
 ## Next Steps After Design Session
 
 1. **Review Generated Docs**: Read DESIGN.md and IMPLEMENTATION.md
+
 2. **Commit to Git**: Ensure all docs are committed
-3. **Start Autonomous Phase**:
+
+3. **⚠️ CRITICAL: Run Pre-Flight Checklist**
+
+   Before starting the workflow, verify configuration (see [HANDOFF_PROTOCOL.md - Pre-Flight Configuration Check](HANDOFF_PROTOCOL.md#pre-flight-configuration-check)):
+
+   ```bash
+   # 1. Verify model names have kilo/ prefix
+   grep MODEL_ config.sh
+   # Should show: kilo/provider/model
+
+   # 2. Check actual dev server port (React projects)
+   grep -A 3 "server:" vite.config.ts
+   # Update all docs with correct port
+
+   # 3. Verify environment variables
+   diff <(grep -v "^#" .env.example | grep "=") \
+        <(grep -v "^#" .env.local | grep "=")
+   # Add any missing vars to .env.local
+
+   # 4. Test dev server is running (React)
+   npm run dev  # In separate terminal
+   curl http://localhost:PORT  # Should return HTML
+
+   # 5. Verify git state is clean
+   git status
+
+   # 6. Check phase sizing
+   # If any phase > 50 files or > 30 routes, consider breaking down
+   ```
+
+4. **Start Autonomous Phase**:
    ```bash
    ./scripts/run-agentic-workflow.sh --project-dir /path/to/project
    ```
-4. **Monitor Progress**: Check PROGRESS.md and feedback directory
-5. **Handle Blocks**: If BLOCKED.md appears, review and intervene
+
+5. **Monitor Progress**: Check PROGRESS.md and feedback directory
+
+6. **Handle Blocks**: If BLOCKED.md appears, review and intervene
+
+## Design Session Checklist (Before Handoff)
+
+Use this checklist to ensure smooth autonomous execution:
+
+### Configuration Verified
+- [ ] Model names in `config.sh` have `kilo/` prefix
+- [ ] Actual dev server port documented (React projects)
+- [ ] All required environment variables in `.env.local`
+- [ ] Dev server starts successfully (React projects)
+- [ ] Git repository is clean
+
+### Design Quality
+- [ ] All requirements mapped to implementation phases
+- [ ] Each phase has < 50 files and < 30 routes (or broken into sub-phases)
+- [ ] Verification steps defined for each phase
+- [ ] Edge cases and error handling documented
+- [ ] Platform-specific concerns addressed
+
+### Documentation Complete
+- [ ] `DESIGN.md` - Architecture and specifications
+- [ ] `IMPLEMENTATION.md` - Phased execution plan
+- [ ] `DESIGN_REVIEW_START.md` - Handoff signal file
+- [ ] `NFR_OVERRIDES.md` - If deviating from baseline NFRs
+- [ ] Port numbers, URLs, and paths are correct
+
+### Handoff Ready
+- [ ] All docs committed to git
+- [ ] Pre-flight checklist passed
+- [ ] Dev server running (for React projects)
+- [ ] Ready to start workflow
+
+**Common Mistakes to Avoid:**
+- ❌ Assuming port 5173 without checking vite.config
+- ❌ Missing `kilo/` prefix in model names
+- ❌ Forgetting to add environment variables
+- ❌ Creating phases that are too large (>50 files)
+- ❌ Not starting dev server before workflow
